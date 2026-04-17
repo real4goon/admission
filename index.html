@@ -2,101 +2,107 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>입원계 대기시간 EMR 프로토타입 (삭제 기능 추가)</title>
+    <title>입원계 대기시간 EMR (Google Sheets 연동)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-        :root { --bg: #f1f5f9; --primary: #1e293b; --accent: #3b82f6; --danger: #ef4444; --border: #cbd5e0; }
+        :root { --bg: #f1f5f9; --primary: #1e293b; --accent: #3b82f6; --danger: #ef4444; --border: #cbd5e0; --green: #10b981; }
         body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #334155; }
-        
-        #appContainer { display: none; max-width: 1300px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); overflow: hidden; position: relative; padding-bottom: 20px; }
-        
-        .header { background: var(--primary); color: white; padding: 20px; text-align: center; }
+
+        #appContainer { display: none; max-width: 1300px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); overflow: hidden; padding-bottom: 20px; }
+
+        .header { background: var(--primary); color: white; padding: 18px 20px; text-align: center; }
         .header h2 { margin: 0; font-size: 20px; font-weight: 700; }
+        .header p  { margin: 5px 0 0; font-size: 12px; color: #94a3b8; }
+
+        /* 동기화 상태 배너 */
+        #syncBanner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; font-size: 13px; font-weight: 700; background: #ecfdf5; color: #065f46; border-bottom: 1px solid #a7f3d0; }
+        #syncBanner.loading { background: #fef9c3; color: #713f12; border-color: #fde047; }
+        #syncBanner.error   { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .sync-dot.spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .tabs { display: flex; background: #e2e8f0; }
-        .tab-btn { flex: 1; padding: 15px; border: none; background: transparent; font-size: 15px; font-weight: 700; color: #64748b; cursor: pointer; transition: 0.2s; }
-        .tab-btn:hover { background: #cbd5e0; }
+        .tab-btn { flex: 1; padding: 14px; border: none; background: transparent; font-size: 14px; font-weight: 700; color: #64748b; cursor: pointer; }
         .tab-btn.active { background: white; color: var(--accent); border-bottom: 3px solid var(--accent); }
 
-        .content { padding: 30px; display: none; }
+        .content { padding: 24px 28px; display: none; }
         .content.active { display: block; }
 
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 14px; }
         label { display: block; font-weight: 700; font-size: 13px; margin-bottom: 5px; color: #475569; }
         input[type="date"], select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 14px; box-sizing: border-box; }
-        button { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 14px; }
-        button:hover { filter: brightness(0.9); }
         
-        /* 버튼 스타일 분리 */
-        .btn-green { background: #10b981; width: 100%; padding: 15px; font-size: 16px; margin-top: 10px; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
-        .btn-red { background: var(--danger); width: 100%; padding: 15px; font-size: 16px; margin-top: 10px; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
-        .btn-green:hover, .btn-red:hover { filter: brightness(0.9); }
-        .btn-print { background: #475569; padding: 8px 15px; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .btn { border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .btn-green  { background: var(--green);   color: white; width: 100%; padding: 12px; font-size: 15px; margin-top: 8px; }
+        .btn-red    { background: var(--danger);  color: white; width: 100%; padding: 12px; font-size: 15px; margin-top: 8px; }
+        .btn-blue   { background: var(--accent);  color: white; padding: 10px 20px; font-size: 14px; }
+        .btn-slate  { background: #64748b;        color: white; width: 100%; padding: 10px; font-size: 13px; margin-top: 5px; }
+        .btn-print  { background: #475569; padding: 8px 14px; font-size: 13px; color: white; display: inline-flex; align-items: center; gap: 5px; }
+        .btn:hover  { filter: brightness(0.9); }
 
-        /* 테이블 기본 속성 */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; text-align: center; table-layout: fixed; }
+        .split-layout { display: grid; grid-template-columns: 310px 1fr; gap: 20px; }
+
+        /* 저장 상태 박스 */
+        .save-status { margin-top: 10px; padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; text-align: center; }
+        .save-status small { font-size: 12px; color: #64748b; font-weight: bold; display: block; }
+        #lastSavedTime { font-size: 13px; font-weight: 800; color: var(--danger); display: inline-block; margin-top: 4px; }
+
+        /* 구글 시트 연동 상태 박스 */
+        .sheets-info { margin-top: 14px; padding: 12px; background: #eff6ff; border: 2px solid #bfdbfe; border-radius: 8px; font-size: 12px; color: #1e40af; line-height: 1.6; }
+        .sheets-info strong { color: #1d4ed8; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; text-align: center; table-layout: fixed; }
         th { background: #f8fafc; padding: 10px 2px; border: 1px solid var(--border); font-size: 12px; font-weight: 700; word-break: keep-all; }
         td { border: 1px solid var(--border); padding: 6px 2px; font-size: 13px; }
+
+        td input[type="text"], td input[type="number"] {
+            text-align: right !important; padding-right: 30px !important;
+            border: 1px solid transparent; background: #f8fafc;
+            width: 100%; padding-top: 6px; padding-bottom: 6px; font-size: 13px; box-sizing: border-box;
+        }
+        td input[type="number"]:focus { border: 1px solid var(--accent); background: white; outline: none; }
         .readonly { background: #e2e8f0 !important; font-weight: bold; }
         .ratio-col { background: transparent !important; color: #64748b; font-weight: 700; font-size: 12px; }
 
-        /* 숫자값 7할 위치 정렬 */
-        td input[type="text"], td input[type="number"] { 
-            text-align: right !important; 
-            padding-right: 35px !important; 
-            border: 1px solid transparent; 
-            background: #f8fafc; 
-            width: 100%; 
-            padding-top: 6px; 
-            padding-bottom: 6px; 
-            font-size: 13px; 
-            box-sizing: border-box; 
-        }
-        td input[type="number"]:focus { border: 1px solid var(--accent); background: white; outline: none; }
-        
         #inputGrid tfoot td:not(:first-child),
         #heatmapTable tbody td:not(:first-child),
-        #heatmapTable tfoot td:not(:first-child) {
-            text-align: right !important;
-            padding-right: 35px !important;
-            box-sizing: border-box;
-        }
+        #heatmapTable tfoot td:not(:first-child) { text-align: right !important; padding-right: 30px !important; }
 
-        .split-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
-        #toast { position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999; }
+        #toast { position: fixed; top: 20px; right: 20px; color: white; padding: 14px 22px; border-radius: 8px; font-weight: bold; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.15); z-index: 9999; font-size: 14px; }
 
-        .hospital-footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); color: #64748b; font-size: 13px; line-height: 1.6; margin-left: 30px; margin-right: 30px; }
+        .nav-hint { font-size: 11px; color: #64748b; margin-bottom: 6px; background: #f0fdf4; padding: 6px 10px; border-radius: 4px; border: 1px solid #bbf7d0; }
+
+        .hospital-footer { text-align: center; margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--border); color: #64748b; font-size: 13px; line-height: 1.6; margin-left: 28px; margin-right: 28px; }
+
         .print-only-header { display: none; }
-        
-        /* 🖨️ 인쇄용 CSS */
+
         @media print {
-            @page { size: A4 portrait; margin: 25mm 10mm 20mm 10mm; } 
+            @page { size: A4 portrait; margin: 25mm 10mm 20mm 10mm; }
             body { background: white; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            #appContainer { display: block !important; box-shadow: none; border-radius: 0; width: 100%; max-width: 100%; margin: 0; padding: 0 !important; box-sizing: border-box; }
-            .header, .tabs, .split-layout > div:first-child, .btn-print, #toast, #tab2, #tab3 { display: none !important; }
+            #appContainer { display: block !important; box-shadow: none; border-radius: 0; width: 100%; max-width: 100%; margin: 0; padding: 0 !important; }
+            .header, #syncBanner, .tabs, .split-layout > div:first-child, .btn-print, #toast, #tab2, #tab3 { display: none !important; }
             .split-layout { display: block; width: 100%; }
             .content { padding: 0; width: 100%; }
-            h3 { display: none; } 
-            .hospital-footer { display: none !important; }
+            h3 { display: none; }
+            .nav-hint, .hospital-footer { display: none !important; }
 
             .print-only-header { display: block; position: relative; width: 100%; height: 25mm; margin-bottom: 15px; }
             .title-area { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; }
-            .title-area h1 { font-size: 22px; margin: 0 0 5px 0; letter-spacing: 0px; white-space: nowrap; }
-            .title-area p { font-size: 12px; color: #333; margin: 0; font-weight: bold; }
-
+            .title-area h1 { font-size: 22px; margin: 0 0 5px 0; }
+            .title-area p  { font-size: 12px; color: #333; margin: 0; font-weight: bold; }
             .approval-area { position: absolute; right: 0; top: 0; width: 55mm; height: 20mm; }
             .approval-table { width: 55mm; height: 20mm; border-collapse: collapse; border: 2px solid #000; background: white; margin: 0; table-layout: fixed; }
             .approval-table th, .approval-table td { border: 1px solid #000; padding: 0; color: #000; text-align: center; }
             .approval-table th { background-color: #f4f4f4 !important; font-weight: bold; height: 8mm; font-size: 13px !important; }
             .approval-table td { height: 12mm; }
-            .sign-th { width: 10mm !important; letter-spacing: 2px; } 
+            .sign-th { width: 10mm !important; letter-spacing: 2px; }
 
             #inputGrid { border: 2px solid #000; width: 100%; table-layout: fixed; }
-            #inputGrid th, #inputGrid tfoot td { background-color: #f0f0f0 !important; font-weight: bold; border: 1px solid #444; color: #000; padding: 5px 1px !important; font-size: 9.5pt !important; letter-spacing: -0.5px; line-height: 1.2; }
+            #inputGrid th, #inputGrid tfoot td { background-color: #f0f0f0 !important; font-weight: bold; border: 1px solid #444; color: #000; padding: 5px 1px !important; font-size: 9.5pt !important; }
             #inputGrid td { border: 1px solid #444; color: #000; font-size: 10pt !important; padding: 5px 1px !important; }
-            
-            td input[type="text"], td input[type="number"] { background: transparent !important; border: none !important; color: #000 !important; font-size: 10pt !important; font-weight: bold; padding-top: 2px !important; padding-bottom: 2px !important; padding-right: 15px !important; text-align: right !important; width: 100%; box-sizing: border-box; }
-            #inputGrid tfoot td:not(:first-child), #heatmapTable tbody td:not(:first-child), #heatmapTable tfoot td:not(:first-child) { text-align: right !important; padding-right: 15px !important; }
+            td input[type="text"], td input[type="number"] { background: transparent !important; border: none !important; color: #000 !important; font-size: 10pt !important; font-weight: bold; padding-right: 10px !important; text-align: right !important; width: 100%; box-sizing: border-box; }
         }
     </style>
 </head>
@@ -104,15 +110,22 @@
 
 <div id="appContainer">
     <div class="header">
-        <h2>🏥 입원계 업무 집중도 통합 EMR 프로토타입</h2>
+        <h2>🏥 입원계 업무 집중도 통합 EMR</h2>
+        <p>Google Sheets 실시간 연동 · 멀티 PC 공유 가능</p>
     </div>
-    
+
+    <div id="syncBanner">
+        <span class="sync-dot"></span>
+        <span id="syncText">Google Sheets 연결 확인 중...</span>
+    </div>
+
     <div class="tabs">
         <button class="tab-btn active" id="tabBtn1" onclick="switchTab(1)">📝 일자별 데이터 입력</button>
         <button class="tab-btn" id="tabBtn2" onclick="switchTab(2)">🔥 누적 대기인원 히트맵</button>
         <button class="tab-btn" id="tabBtn3" onclick="switchTab(3)">📈 시각화 분석 그래프</button>
     </div>
 
+    <!-- TAB 1 -->
     <div id="tab1" class="content active">
         <div class="print-only-header">
             <div class="title-area">
@@ -122,81 +135,81 @@
             <div class="approval-area">
                 <table class="approval-table">
                     <tr>
-                        <th class="sign-th" rowspan="2" style="writing-mode: vertical-rl; text-orientation: upright; padding: 2px;">결재</th>
-                        <th>담 당</th>
-                        <th>대 리</th>
-                        <th>팀 장</th>
+                        <th class="sign-th" rowspan="2" style="writing-mode:vertical-rl;text-orientation:upright;padding:2px;">결재</th>
+                        <th>담 당</th><th>대 리</th><th>팀 장</th>
                     </tr>
-                    <tr>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
+                    <tr><td></td><td></td><td></td></tr>
                 </table>
             </div>
         </div>
 
         <div class="split-layout">
+            <!-- 왼쪽 패널 -->
             <div>
                 <div class="form-group">
                     <label>📅 입력 일자 선택</label>
-                    <input type="date" id="inputDate" onchange="loadGridData()">
+                    <input type="date" id="inputDate" onchange="onDateChange()">
                 </div>
-                <div class="form-group" style="margin-top: 30px;">
+
+                <div class="form-group">
                     <label>🚀 엑셀 데이터 빠른 붙여넣기</label>
-                    <textarea id="pasteArea" rows="8" placeholder="엑셀 데이터를 복사하여 붙여넣고 버튼을 누르세요."></textarea>
-                    <button onclick="parsePasteData()" style="width:100%; margin-top:5px; background:#64748b;">엑셀 데이터 적용</button>
+                    <textarea id="pasteArea" rows="6" placeholder="엑셀 데이터를 복사하여 붙여넣고 버튼을 누르세요."></textarea>
+                    <button class="btn btn-slate" onclick="parsePasteData()">엑셀 데이터 적용</button>
                 </div>
-                
-                <button class="btn-green" onclick="saveData()">💾 EMR 서버(로컬) 저장</button>
-                <button class="btn-red" onclick="clearData()">🗑️ 해당 일자 데이터 전체 삭제</button>
-                
-                <div style="margin-top: 15px; padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; text-align: center;">
-                    <span style="font-size: 12px; color: #64748b; font-weight: bold;">해당 일자 최근 저장 기록</span><br>
-                    <span id="lastSavedTime" style="font-size: 14px; font-weight: 800; color: var(--danger); display: inline-block; margin-top: 4px;">기록 없음</span>
+
+                <button class="btn btn-green" onclick="saveData()">☁️ Google Sheets 저장 (전 직원 공유)</button>
+                <button class="btn btn-red"   onclick="clearData()">🗑️ 해당 일자 데이터 전체 삭제</button>
+
+                <div class="save-status">
+                    <small>📌 해당 일자 최근 저장 기록</small>
+                    <span id="lastSavedTime">기록 없음</span>
+                </div>
+
+                <div class="sheets-info">
+                    <strong>☁️ Google Sheets 연동 안내</strong><br>
+                    · 저장 버튼 클릭 시 전 직원 공유 시트에 즉시 반영<br>
+                    · 날짜 변경 시 해당 일자 데이터를 시트에서 자동 불러옴<br>
+                    · 인터넷 연결 필요 (병원 내부망 외부 연결 가능한 경우)
                 </div>
             </div>
 
+            <!-- 오른쪽: 입력 그리드 -->
             <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="margin: 0; font-size:16px;">세부 업무별 건수 입력 (입원업무 분리)</h3>
-                    <button class="btn-print" onclick="printReport()">🖨️ 일일 보고서 인쇄 / PDF 저장</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h3 style="margin:0; font-size:16px;">세부 업무별 건수 입력</h3>
+                    <button class="btn btn-print" onclick="printReport()">🖨️ 일일 보고서 인쇄 / PDF</button>
                 </div>
+                <div class="nav-hint">💡 <strong>Enter</strong> 또는 <strong>Tab</strong> 키 → 같은 열의 <strong>아래 칸</strong>으로 이동</div>
                 <table id="inputGrid">
                     <thead>
                         <tr>
-                            <th style="width: 14%;">구분(시간)</th>
-                            <th style="width: 11%;">입원수속</th>
-                            <th style="width: 11%;">입원예약</th>
-                            <th style="width: 12%; background: #e2e8f0;">입원 합계</th>
-                            <th style="width: 14%; color: #3b82f6;">입원업무<br>구성비(%)</th>
-                            <th style="width: 11%;">출입증</th>
-                            <th style="width: 12%; background: #e2e8f0;">총 합계</th>
-                            <th style="width: 15%; color: #ef4444;">전체업무<br>구성비(%)</th>
+                            <th style="width:14%;">구분(시간)</th>
+                            <th style="width:11%;">입원수속</th>
+                            <th style="width:11%;">입원예약</th>
+                            <th style="width:12%; background:#e2e8f0;">입원 합계</th>
+                            <th style="width:14%; color:#3b82f6;">입원업무<br>구성비(%)</th>
+                            <th style="width:11%;">출입증</th>
+                            <th style="width:12%; background:#e2e8f0;">총 합계</th>
+                            <th style="width:15%; color:#ef4444;">전체업무<br>구성비(%)</th>
                         </tr>
                     </thead>
-                    <tbody id="gridBody">
-                        </tbody>
+                    <tbody id="gridBody"></tbody>
                     <tfoot>
-                        <tr style="background: #e2e8f0; font-weight: bold;">
-                            <td style="text-align: center !important; padding-right: 0 !important;">총 합계(건)</td>
-                            <td id="sum_susok">0</td>
-                            <td id="sum_yeyak">0</td>
-                            <td id="sum_in_total" style="color: #3b82f6;">0</td>
-                            <td style="color: #3b82f6;">100.0%</td>
+                        <tr style="background:#e2e8f0; font-weight:bold;">
+                            <td style="text-align:center !important;">총 합계(건)</td>
+                            <td id="sum_susok">0</td><td id="sum_yeyak">0</td>
+                            <td id="sum_in_total" style="color:#3b82f6;">0</td>
+                            <td style="color:#3b82f6;">100.0%</td>
                             <td id="sum_pass">0</td>
-                            <td id="sum_total" style="color: var(--danger);">0</td>
-                            <td style="color: var(--danger);">100.0%</td>
+                            <td id="sum_total" style="color:var(--danger);">0</td>
+                            <td style="color:var(--danger);">100.0%</td>
                         </tr>
-                        <tr style="background: #dbeafe; font-weight: bold; color: #1e40af;">
-                            <td style="text-align: center !important; padding-right: 0 !important;">업무 비중</td>
-                            <td id="ratio_susok">-</td>
-                            <td id="ratio_yeyak">-</td>
-                            <td id="ratio_in_total">-</td>
-                            <td>-</td>
+                        <tr style="background:#dbeafe; font-weight:bold; color:#1e40af;">
+                            <td style="text-align:center !important;">업무 비중</td>
+                            <td id="ratio_susok">-</td><td id="ratio_yeyak">-</td>
+                            <td id="ratio_in_total">-</td><td>-</td>
                             <td id="ratio_pass">-</td>
-                            <td id="ratio_total">-</td>
-                            <td>-</td>
+                            <td id="ratio_total">-</td><td>-</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -204,85 +217,62 @@
         </div>
     </div>
 
+    <!-- TAB 2 -->
     <div id="tab2" class="content">
-        <div style="display: flex; gap: 15px; align-items: end; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border);">
-            <div class="form-group" style="margin:0; width: 200px;">
-                <label>시작일</label>
-                <input type="date" id="searchStart">
-            </div>
-            <div class="form-group" style="margin:0; width: 200px;">
-                <label>종료일</label>
-                <input type="date" id="searchEnd">
-            </div>
-            <button onclick="runAnalysis()" style="height: 40px; padding: 0 30px;">히트맵 조회</button>
+        <div style="display:flex; gap:15px; align-items:end; background:#f8fafc; padding:18px; border-radius:8px; border:1px solid var(--border);">
+            <div class="form-group" style="margin:0; width:200px;"><label>시작일</label><input type="date" id="searchStart"></div>
+            <div class="form-group" style="margin:0; width:200px;"><label>종료일</label><input type="date" id="searchEnd"></div>
+            <button class="btn btn-blue" onclick="runAnalysis()" style="height:40px; padding:0 28px;">히트맵 조회</button>
         </div>
-
-        <div style="margin-top: 30px;">
-            <h3 style="font-size:16px;">🔥 시간대별 / 항목별 누적 대기 인원 히트맵</h3>
-            <table id="heatmapTable" style="margin-top: 15px;">
-                <thead>
-                    <tr>
-                        <th style="width: 14%;">구분(시간)</th>
-                        <th style="width: 11%;">입원수속</th>
-                        <th style="width: 11%;">입원예약</th>
-                        <th style="width: 12%; background: #e2e8f0;">입원 합계</th>
-                        <th style="width: 14%; color: #3b82f6;">입원업무<br>구성비(%)</th>
-                        <th style="width: 11%;">출입증</th>
-                        <th style="width: 12%; background: #e2e8f0;">총 합계</th>
-                        <th style="width: 15%; color: #ef4444;">전체업무<br>구성비(%)</th>
-                    </tr>
-                </thead>
+        <div style="margin-top:24px;">
+            <h3 style="font-size:16px;">🔥 시간대별 / 항목별 누적 히트맵</h3>
+            <table id="heatmapTable" style="margin-top:12px;">
+                <thead><tr>
+                    <th style="width:14%;">구분(시간)</th>
+                    <th style="width:11%;">입원수속</th><th style="width:11%;">입원예약</th>
+                    <th style="width:12%; background:#e2e8f0;">입원 합계</th>
+                    <th style="width:14%; color:#3b82f6;">입원업무<br>구성비(%)</th>
+                    <th style="width:11%;">출입증</th>
+                    <th style="width:12%; background:#e2e8f0;">총 합계</th>
+                    <th style="width:15%; color:#ef4444;">전체업무<br>구성비(%)</th>
+                </tr></thead>
                 <tbody id="heatmapBody">
-                    <tr><td colspan="8" style="color: #94a3b8; padding: 30px; text-align: center !important; padding-right: 0 !important;">기간을 설정하고 조회 버튼을 눌러주세요.</td></tr>
+                    <tr><td colspan="8" style="color:#94a3b8; padding:30px; text-align:center !important;">기간을 설정하고 조회 버튼을 눌러주세요.</td></tr>
                 </tbody>
-                <tfoot id="heatmapFoot" style="display: none;">
-                    <tr style="background: #e2e8f0; font-weight: bold; border-top: 2px solid #94a3b8;">
-                        <td style="text-align: center !important; padding-right: 0 !important;">총 합계(건)</td>
-                        <td id="hm_sum_susok">0</td>
-                        <td id="hm_sum_yeyak">0</td>
-                        <td id="hm_sum_in_total" style="color: #3b82f6;">0</td>
-                        <td style="color: #3b82f6;">100.0%</td>
+                <tfoot id="heatmapFoot" style="display:none;">
+                    <tr style="background:#e2e8f0; font-weight:bold; border-top:2px solid #94a3b8;">
+                        <td style="text-align:center !important;">총 합계(건)</td>
+                        <td id="hm_sum_susok">0</td><td id="hm_sum_yeyak">0</td>
+                        <td id="hm_sum_in_total" style="color:#3b82f6;">0</td><td style="color:#3b82f6;">100.0%</td>
                         <td id="hm_sum_pass">0</td>
-                        <td id="hm_sum_total" style="color: var(--danger);">0</td>
-                        <td style="color: var(--danger);">100.0%</td>
+                        <td id="hm_sum_total" style="color:var(--danger);">0</td><td style="color:var(--danger);">100.0%</td>
                     </tr>
-                    <tr style="background: #dbeafe; font-weight: bold; color: #1e40af;">
-                        <td style="text-align: center !important; padding-right: 0 !important;">업무 비중</td>
-                        <td id="hm_ratio_susok">-</td>
-                        <td id="hm_ratio_yeyak">-</td>
-                        <td id="hm_ratio_in_total">-</td>
-                        <td>-</td>
-                        <td id="hm_ratio_pass">-</td>
-                        <td id="hm_ratio_total">-</td>
-                        <td>-</td>
+                    <tr style="background:#dbeafe; font-weight:bold; color:#1e40af;">
+                        <td style="text-align:center !important;">업무 비중</td>
+                        <td id="hm_ratio_susok">-</td><td id="hm_ratio_yeyak">-</td>
+                        <td id="hm_ratio_in_total">-</td><td>-</td>
+                        <td id="hm_ratio_pass">-</td><td id="hm_ratio_total">-</td><td>-</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
     </div>
 
+    <!-- TAB 3 -->
     <div id="tab3" class="content">
-        <div style="display: flex; gap: 15px; align-items: end; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid var(--border);">
-            <div class="form-group" style="margin:0; width: 200px;">
-                <label>시작일</label>
-                <input type="date" id="chartStart">
-            </div>
-            <div class="form-group" style="margin:0; width: 200px;">
-                <label>종료일</label>
-                <input type="date" id="chartEnd">
-            </div>
-            <button onclick="runCharts()" style="height: 40px; padding: 0 30px;">그래프 그리기</button>
+        <div style="display:flex; gap:15px; align-items:end; background:#f8fafc; padding:18px; border-radius:8px; border:1px solid var(--border);">
+            <div class="form-group" style="margin:0; width:200px;"><label>시작일</label><input type="date" id="chartStart"></div>
+            <div class="form-group" style="margin:0; width:200px;"><label>종료일</label><input type="date" id="chartEnd"></div>
+            <button class="btn btn-blue" onclick="runCharts()" style="height:40px; padding:0 28px;">그래프 그리기</button>
         </div>
-
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 30px;">
-            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px;">
-                <h3 style="margin-top:0; font-size: 15px;">📊 시간대별 업무 집중도 (막대: 세부업무, 꺾은선: 총합)</h3>
-                <canvas id="timeChart" style="max-height: 400px;"></canvas>
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-top:24px;">
+            <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:18px;">
+                <h3 style="margin-top:0; font-size:15px;">📊 시간대별 업무 집중도</h3>
+                <canvas id="timeChart" style="max-height:400px;"></canvas>
             </div>
-            
-            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px;">
-                <h3 style="margin-top:0; font-size: 15px;">🥧 전체 누적 업무별 비중</h3>
-                <canvas id="taskChart" style="max-height: 350px; margin-top: 20px;"></canvas>
+            <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:18px;">
+                <h3 style="margin-top:0; font-size:15px;">🥧 전체 누적 업무별 비중</h3>
+                <canvas id="taskChart" style="max-height:350px; margin-top:20px;"></canvas>
             </div>
         </div>
     </div>
@@ -291,447 +281,484 @@
         <strong>한림대학교성심병원 원무팀</strong><br>
         * 자료 무단 반출 및 데이터 훼손시 법적 처벌받을 수 있습니다.
     </div>
-
 </div>
 
-<div id="toast">저장되었습니다!</div>
+<div id="toast"></div>
 
 <script>
-    const SYSTEM_PASSWORD = "4114"; 
+// ════════════════════════════════════════════
+//  설정: Apps Script URL (배포 후 변경하지 않아도 됨)
+// ════════════════════════════════════════════
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDGSkbJaVnsAHlNgzTXTX_7vhs6C7Cj8gjGCSMujAB8XjND0pCm6H3T9VZJZyMDuRXTw/exec';
+const SYSTEM_PASSWORD = '4114';
 
-    const TIME_SLOTS = [
-        "09:00 - 09:30", "09:30 - 10:00", "10:00 - 10:30", "10:30 - 11:00",
-        "11:00 - 11:30", "11:30 - 12:00", "12:00 - 12:30", "12:30 - 13:00",
-        "13:00 - 13:30", "13:30 - 14:00", "14:00 - 14:30", "14:30 - 15:00",
-        "15:00 - 15:30", "15:30 - 16:00", "16:00 - 16:30", "16:30 - 17:00", "17:00 - 17:30"
-    ];
+const TIME_SLOTS = [
+    '09:00 - 09:30','09:30 - 10:00','10:00 - 10:30','10:30 - 11:00',
+    '11:00 - 11:30','11:30 - 12:00','12:00 - 12:30','12:30 - 13:00',
+    '13:00 - 13:30','13:30 - 14:00','14:00 - 14:30','14:30 - 15:00',
+    '15:00 - 15:30','15:30 - 16:00','16:00 - 16:30','16:30 - 17:00','17:00 - 17:30'
+];
+const EDITABLE_COLS = ['susok', 'yeyak', 'pass'];
 
-    let timeChartInstance = null;
-    let taskChartInstance = null;
+let timeChartInstance = null;
+let taskChartInstance = null;
 
-    function getDB() { return JSON.parse(localStorage.getItem('emr_wait_data')) || {}; }
-    function setDB(data) { localStorage.setItem('emr_wait_data', JSON.stringify(data)); }
+// ── 로컬 캐시 (빠른 화면 표시용) ───────────────
+let localCache = {};   // { date: { timeSlot: {susok,yeyak,pass} } }
+let localMeta  = {};   // { date: savedAtString }
 
-    function getMetaDB() { return JSON.parse(localStorage.getItem('emr_wait_data_meta')) || {}; }
-    function setMetaDB(data) { localStorage.setItem('emr_wait_data_meta', JSON.stringify(data)); }
+// ════════════════════════════════════════════
+//  초기화
+// ════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    const pw = prompt('원무팀 시스템 접속을 위한 비밀번호 4자리를 입력하세요.');
+    if (pw !== SYSTEM_PASSWORD) {
+        document.body.innerHTML = `
+            <div style="text-align:center; margin-top:100px; font-family:sans-serif;">
+                <h1 style="color:#ef4444;">접속이 차단되었습니다 🚫</h1>
+                <p>비밀번호가 올바르지 않습니다. 페이지를 새로고침(F5)하여 다시 시도해 주세요.</p>
+            </div>`;
+        return;
+    }
 
-    document.addEventListener("DOMContentLoaded", () => {
-        let inputPW = prompt("원무팀 시스템 접속을 위한 비밀번호 4자리를 입력하세요.");
-        
-        if (inputPW === SYSTEM_PASSWORD) {
-            document.getElementById('appContainer').style.display = 'block';
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('inputDate').value = today;
-            document.getElementById('searchStart').value = today;
-            document.getElementById('searchEnd').value = today;
-            document.getElementById('chartStart').value = today;
-            document.getElementById('chartEnd').value = today;
-
-            initGrid();
-            loadGridData();
-        } else {
-            document.body.innerHTML = `
-                <div style="text-align: center; margin-top: 100px; font-family: sans-serif;">
-                    <h1 style="color: #ef4444;">접속이 차단되었습니다 🚫</h1>
-                    <p>비밀번호가 올바르지 않습니다. 페이지를 새로고침(F5)하여 다시 시도해 주세요.</p>
-                </div>
-            `;
-        }
+    document.getElementById('appContainer').style.display = 'block';
+    const today = new Date().toISOString().split('T')[0];
+    ['inputDate','searchStart','searchEnd','chartStart','chartEnd'].forEach(id => {
+        document.getElementById(id).value = today;
     });
 
-    function switchTab(tabNum) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-        document.getElementById('tabBtn' + tabNum).classList.add('active');
-        document.getElementById('tab' + tabNum).classList.add('active');
+    initGrid();
+    checkConnection();          // 연결 확인 + 오늘 데이터 로드
+});
+
+// ════════════════════════════════════════════
+//  Google Sheets API 호출
+// ════════════════════════════════════════════
+
+/** GET: 기간 데이터 조회 */
+async function sheetsGet(start, end) {
+    const url = `${SCRIPT_URL}?action=getData&start=${start}&end=${end}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || '조회 실패');
+    return json;  // { data, meta }
+}
+
+/** POST: 저장 또는 삭제 */
+async function sheetsPost(payload) {
+    const res  = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || '처리 실패');
+    return json;
+}
+
+// ════════════════════════════════════════════
+//  연결 확인
+// ════════════════════════════════════════════
+async function checkConnection() {
+    setSyncBanner('loading', '🔄 Google Sheets 연결 확인 중...');
+    try {
+        const today = document.getElementById('inputDate').value;
+        const result = await sheetsGet(today, today);
+        // 캐시에 반영
+        Object.assign(localCache, result.data || {});
+        Object.assign(localMeta,  result.meta || {});
+        renderGrid(today);
+        setSyncBanner('ok', '✅ Google Sheets 연결됨 — 데이터 실시간 공유 중');
+    } catch(e) {
+        setSyncBanner('error', '⚠️ 연결 실패: ' + e.message + ' (인터넷 연결 확인)');
     }
+}
 
-    function initGrid() {
-        const tbody = document.getElementById('gridBody');
-        tbody.innerHTML = '';
-        TIME_SLOTS.forEach((time, index) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-weight:bold; background:#f8fafc; font-size:12px; text-align:center !important; padding-right: 0 !important;">${time}</td>
-                <td><input type="number" min="0" id="susok_${index}" oninput="calcAllTotals()"></td>
-                <td><input type="number" min="0" id="yeyak_${index}" oninput="calcAllTotals()"></td>
-                <td><input type="number" class="readonly" id="in_total_${index}" readonly></td>
-                <td><input type="text" class="ratio-col" id="in_ratio_${index}" readonly placeholder="-"></td>
-                <td><input type="number" min="0" id="pass_${index}" oninput="calcAllTotals()"></td>
-                <td><input type="number" class="readonly" id="total_${index}" readonly></td>
-                <td><input type="text" class="ratio-col" id="ratio_${index}" readonly placeholder="-"></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
+function setSyncBanner(type, text) {
+    const banner = document.getElementById('syncBanner');
+    const dot    = banner.querySelector('.sync-dot');
+    banner.className = type === 'ok' ? '' : (type === 'loading' ? 'loading' : 'error');
+    document.getElementById('syncText').innerText = text;
+    dot.className = 'sync-dot' + (type === 'loading' ? ' spin' : '');
+}
 
-    function calcAllTotals() {
-        let sumS = 0, sumY = 0, sumP = 0;
-        let inTotals = [], grandTotals = [];
+// ════════════════════════════════════════════
+//  탭 전환
+// ════════════════════════════════════════════
+function switchTab(n) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tabBtn' + n).classList.add('active');
+    document.getElementById('tab' + n).classList.add('active');
+}
 
-        for(let i=0; i<TIME_SLOTS.length; i++) {
-            let s = parseInt(document.getElementById(`susok_${i}`).value) || 0;
-            let y = parseInt(document.getElementById(`yeyak_${i}`).value) || 0;
-            let p = parseInt(document.getElementById(`pass_${i}`).value) || 0;
-            
-            let in_t = s + y;       
-            let g_t = in_t + p;     
-            
-            document.getElementById(`in_total_${i}`).value = in_t || '';
-            document.getElementById(`total_${i}`).value = g_t || '';
-            
-            inTotals.push(in_t);
-            grandTotals.push(g_t);
-            sumS += s; sumY += y; sumP += p;
-        }
+// ════════════════════════════════════════════
+//  그리드 초기화 & 렌더링
+// ════════════════════════════════════════════
+function initGrid() {
+    const tbody = document.getElementById('gridBody');
+    tbody.innerHTML = '';
+    TIME_SLOTS.forEach((time, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight:bold; background:#f8fafc; font-size:12px; text-align:center !important;">${time}</td>
+            <td><input type="number" min="0" id="susok_${index}" oninput="calcAllTotals()"></td>
+            <td><input type="number" min="0" id="yeyak_${index}" oninput="calcAllTotals()"></td>
+            <td><input type="number" class="readonly" id="in_total_${index}" readonly></td>
+            <td><input type="text" class="ratio-col" id="in_ratio_${index}" readonly placeholder="-"></td>
+            <td><input type="number" min="0" id="pass_${index}" oninput="calcAllTotals()"></td>
+            <td><input type="number" class="readonly" id="total_${index}" readonly></td>
+            <td><input type="text" class="ratio-col" id="ratio_${index}" readonly placeholder="-"></td>
+        `;
+        tbody.appendChild(tr);
 
-        let totalIn = sumS + sumY;
-        let totalGrand = totalIn + sumP;
-
-        for(let i=0; i<TIME_SLOTS.length; i++) {
-            let inRatioInput = document.getElementById(`in_ratio_${i}`);
-            let grandRatioInput = document.getElementById(`ratio_${i}`);
-            
-            inRatioInput.value = (totalIn > 0 && inTotals[i] > 0) ? (inTotals[i] / totalIn * 100).toFixed(1) + '%' : '';
-            grandRatioInput.value = (totalGrand > 0 && grandTotals[i] > 0) ? (grandTotals[i] / totalGrand * 100).toFixed(1) + '%' : '';
-        }
-
-        document.getElementById('sum_susok').innerText = sumS;
-        document.getElementById('sum_yeyak').innerText = sumY;
-        document.getElementById('sum_in_total').innerText = totalIn;
-        document.getElementById('sum_pass').innerText = sumP;
-        document.getElementById('sum_total').innerText = totalGrand;
-
-        if (totalGrand > 0) {
-            document.getElementById('ratio_susok').innerText = (sumS / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('ratio_yeyak').innerText = (sumY / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('ratio_in_total').innerText = (totalIn / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('ratio_pass').innerText = (sumP / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('ratio_total').innerText = '100.0%';
-        } else {
-            document.getElementById('ratio_susok').innerText = '-';
-            document.getElementById('ratio_yeyak').innerText = '-';
-            document.getElementById('ratio_in_total').innerText = '-';
-            document.getElementById('ratio_pass').innerText = '-';
-            document.getElementById('ratio_total').innerText = '-';
-        }
-    }
-
-    function loadGridData() {
-        const date = document.getElementById('inputDate').value;
-        const db = getDB();
-        const dayData = db[date] || {};
-
-        TIME_SLOTS.forEach((time, index) => {
-            const data = dayData[time] || { susok: '', yeyak: '', pass: '' };
-            document.getElementById(`susok_${index}`).value = data.susok || '';
-            document.getElementById(`yeyak_${index}`).value = data.yeyak || '';
-            document.getElementById(`pass_${index}`).value = data.pass || '';
-        });
-        calcAllTotals();
-
-        const metaDb = getMetaDB();
-        const savedTimeStr = metaDb[date];
-        const timeSpan = document.getElementById('lastSavedTime');
-        
-        if (savedTimeStr) {
-            timeSpan.innerText = savedTimeStr;
-            timeSpan.style.color = "var(--primary)";
-        } else {
-            timeSpan.innerText = "기록 없음";
-            timeSpan.style.color = "var(--danger)";
-        }
-    }
-
-    function saveData() {
-        const date = document.getElementById('inputDate').value;
-        if(!date) return alert("입력 일자를 선택하세요.");
-
-        const db = getDB();
-        if(!db[date]) db[date] = {};
-
-        TIME_SLOTS.forEach((time, index) => {
-            const susok = parseInt(document.getElementById(`susok_${index}`).value) || 0;
-            const yeyak = parseInt(document.getElementById(`yeyak_${index}`).value) || 0;
-            const pass = parseInt(document.getElementById(`pass_${index}`).value) || 0;
-            const total = susok + yeyak + pass;
-
-            if (total > 0) {
-                db[date][time] = { susok, yeyak, pass };
-            } else {
-                delete db[date][time];
-            }
-        });
-        setDB(db);
-
-        const metaDb = getMetaDB();
-        const now = new Date();
-        const timeString = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        
-        metaDb[date] = timeString;
-        setMetaDB(metaDb);
-
-        const timeSpan = document.getElementById('lastSavedTime');
-        timeSpan.innerText = timeString;
-        timeSpan.style.color = "var(--primary)";
-
-        showToast("저장되었습니다!", "#10b981");
-    }
-
-    // 🎯 [핵심] 해당 일자 데이터 전체 삭제 기능
-    function clearData() {
-        const date = document.getElementById('inputDate').value;
-        if(!date) return alert("삭제할 일자를 먼저 선택하세요.");
-        
-        // 경고창(Confirm)으로 한 번 더 확인
-        if(!confirm(`⚠️ 경고: [${date}] 일자의 모든 입력 데이터를 정말 삭제하시겠습니까?\n(이 작업은 되돌릴 수 없습니다)`)) {
-            return;
-        }
-
-        const db = getDB();
-        const metaDb = getMetaDB();
-
-        // 데이터 삭제
-        if(db[date]) {
-            delete db[date];
-            setDB(db);
-        }
-        
-        // 메타데이터(저장 기록) 삭제
-        if(metaDb[date]) {
-            delete metaDb[date];
-            setMetaDB(metaDb);
-        }
-
-        // 화면 새로고침 (입력칸 초기화)
-        loadGridData();
-        
-        // 삭제용 빨간색 토스트 알림 띄우기
-        showToast("데이터가 완전히 삭제되었습니다.", "#ef4444");
-    }
-
-    function parsePasteData() {
-        const text = document.getElementById('pasteArea').value.trim();
-        if(!text) return alert("붙여넣은 데이터가 없습니다.");
-
-        const rows = text.split('\n');
-        
-        TIME_SLOTS.forEach((_, index) => {
-            document.getElementById(`susok_${index}`).value = '';
-            document.getElementById(`yeyak_${index}`).value = '';
-            document.getElementById(`pass_${index}`).value = '';
-        });
-
-        rows.forEach(row => {
-            const cols = row.split(/\t|,/);
-            if(cols[0] && cols[0].includes(':')) {
-                const timeStr = cols[0].trim();
-                const idx = TIME_SLOTS.indexOf(timeStr);
-                
-                if(idx !== -1) {
-                    document.getElementById(`susok_${idx}`).value = parseInt(cols[1]) || 0;
-                    document.getElementById(`yeyak_${idx}`).value = parseInt(cols[2]) || 0;
-                    const passVal = parseInt(cols[5]) || parseInt(cols[4]) || 0; 
-                    document.getElementById(`pass_${idx}`).value = passVal;
+        // ★ Enter / Tab → 같은 열 아래 칸
+        EDITABLE_COLS.forEach(col => {
+            document.getElementById(`${col}_${index}`).addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    const next = index + 1 < TIME_SLOTS.length
+                        ? `${col}_${index + 1}`
+                        : `${EDITABLE_COLS[(EDITABLE_COLS.indexOf(col) + 1) % EDITABLE_COLS.length]}_0`;
+                    document.getElementById(next).focus();
                 }
+            });
+        });
+    });
+}
+
+function renderGrid(date) {
+    const dayData = localCache[date] || {};
+    TIME_SLOTS.forEach((time, index) => {
+        const d = dayData[time] || {};
+        document.getElementById(`susok_${index}`).value = d.susok || '';
+        document.getElementById(`yeyak_${index}`).value = d.yeyak || '';
+        document.getElementById(`pass_${index}`).value  = d.pass  || '';
+    });
+    calcAllTotals();
+
+    const saved = localMeta[date];
+    const el = document.getElementById('lastSavedTime');
+    el.innerText = saved || '기록 없음';
+    el.style.color = saved ? 'var(--primary)' : 'var(--danger)';
+}
+
+// ════════════════════════════════════════════
+//  날짜 변경
+// ════════════════════════════════════════════
+async function onDateChange() {
+    const date = document.getElementById('inputDate').value;
+    if (!date) return;
+
+    // 캐시에 있으면 즉시 표시
+    renderGrid(date);
+
+    // 항상 시트에서 최신 데이터 가져오기
+    setSyncBanner('loading', '🔄 데이터 불러오는 중...');
+    try {
+        const result = await sheetsGet(date, date);
+        Object.assign(localCache, result.data || {});
+        Object.assign(localMeta,  result.meta || {});
+        renderGrid(date);
+        setSyncBanner('ok', '✅ Google Sheets 연결됨 — 데이터 실시간 공유 중');
+    } catch(e) {
+        setSyncBanner('error', '⚠️ 불러오기 실패: ' + e.message);
+    }
+}
+
+// ════════════════════════════════════════════
+//  저장
+// ════════════════════════════════════════════
+async function saveData() {
+    const date = document.getElementById('inputDate').value;
+    if (!date) return alert('입력 일자를 선택하세요.');
+
+    // 그리드에서 데이터 수집
+    const timeData = {};
+    TIME_SLOTS.forEach((time, i) => {
+        const susok = parseInt(document.getElementById(`susok_${i}`).value) || 0;
+        const yeyak = parseInt(document.getElementById(`yeyak_${i}`).value) || 0;
+        const pass  = parseInt(document.getElementById(`pass_${i}`).value)  || 0;
+        if (susok + yeyak + pass > 0) timeData[time] = { susok, yeyak, pass };
+    });
+
+    const now = new Date();
+    const savedAt = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+    setSyncBanner('loading', '☁️ Google Sheets에 저장 중...');
+    try {
+        await sheetsPost({ action: 'saveDay', date, data: timeData, savedAt });
+
+        // 캐시 갱신
+        localCache[date] = timeData;
+        localMeta[date]  = savedAt;
+        renderGrid(date);
+
+        setSyncBanner('ok', '✅ 저장 완료 — Google Sheets에 반영되었습니다');
+        showToast('☁️ Google Sheets에 저장되었습니다!', '#10b981');
+    } catch(e) {
+        setSyncBanner('error', '⚠️ 저장 실패: ' + e.message);
+        showToast('저장 실패: ' + e.message, '#ef4444');
+    }
+}
+
+// ════════════════════════════════════════════
+//  삭제
+// ════════════════════════════════════════════
+async function clearData() {
+    const date = document.getElementById('inputDate').value;
+    if (!date) return alert('삭제할 일자를 먼저 선택하세요.');
+    if (!confirm(`⚠️ [${date}] 일자의 모든 데이터를 삭제하시겠습니까?\n(Google Sheets에서도 즉시 삭제됩니다)`)) return;
+
+    setSyncBanner('loading', '🗑️ 삭제 중...');
+    try {
+        await sheetsPost({ action: 'clearDay', date });
+        delete localCache[date];
+        delete localMeta[date];
+        renderGrid(date);
+        setSyncBanner('ok', '✅ 삭제 완료');
+        showToast('데이터가 삭제되었습니다.', '#ef4444');
+    } catch(e) {
+        setSyncBanner('error', '⚠️ 삭제 실패: ' + e.message);
+    }
+}
+
+// ════════════════════════════════════════════
+//  합계 / 비중 계산
+// ════════════════════════════════════════════
+function calcAllTotals() {
+    let sumS = 0, sumY = 0, sumP = 0;
+    const inTotals = [], grandTotals = [];
+
+    for (let i = 0; i < TIME_SLOTS.length; i++) {
+        const s = parseInt(document.getElementById(`susok_${i}`).value) || 0;
+        const y = parseInt(document.getElementById(`yeyak_${i}`).value) || 0;
+        const p = parseInt(document.getElementById(`pass_${i}`).value)  || 0;
+        const in_t = s + y, g_t = in_t + p;
+        document.getElementById(`in_total_${i}`).value = in_t || '';
+        document.getElementById(`total_${i}`).value    = g_t  || '';
+        inTotals.push(in_t); grandTotals.push(g_t);
+        sumS += s; sumY += y; sumP += p;
+    }
+    const totalIn = sumS + sumY, totalGrand = totalIn + sumP;
+
+    for (let i = 0; i < TIME_SLOTS.length; i++) {
+        document.getElementById(`in_ratio_${i}`).value = (totalIn > 0 && inTotals[i] > 0) ? (inTotals[i]/totalIn*100).toFixed(1)+'%' : '';
+        document.getElementById(`ratio_${i}`).value    = (totalGrand > 0 && grandTotals[i] > 0) ? (grandTotals[i]/totalGrand*100).toFixed(1)+'%' : '';
+    }
+
+    document.getElementById('sum_susok').innerText    = sumS;
+    document.getElementById('sum_yeyak').innerText    = sumY;
+    document.getElementById('sum_in_total').innerText = totalIn;
+    document.getElementById('sum_pass').innerText     = sumP;
+    document.getElementById('sum_total').innerText    = totalGrand;
+
+    const ratioIds = ['ratio_susok','ratio_yeyak','ratio_in_total','ratio_pass','ratio_total'];
+    if (totalGrand > 0) {
+        document.getElementById('ratio_susok').innerText    = (sumS/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('ratio_yeyak').innerText    = (sumY/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('ratio_in_total').innerText = (totalIn/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('ratio_pass').innerText     = (sumP/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('ratio_total').innerText    = '100.0%';
+    } else {
+        ratioIds.forEach(id => document.getElementById(id).innerText = '-');
+    }
+}
+
+// ════════════════════════════════════════════
+//  엑셀 붙여넣기
+// ════════════════════════════════════════════
+function parsePasteData() {
+    const text = document.getElementById('pasteArea').value.trim();
+    if (!text) return alert('붙여넣은 데이터가 없습니다.');
+    TIME_SLOTS.forEach((_, i) => {
+        ['susok','yeyak','pass'].forEach(c => document.getElementById(`${c}_${i}`).value = '');
+    });
+    text.split('\n').forEach(row => {
+        const cols = row.split(/\t|,/);
+        if (cols[0] && cols[0].includes(':')) {
+            const idx = TIME_SLOTS.indexOf(cols[0].trim());
+            if (idx !== -1) {
+                document.getElementById(`susok_${idx}`).value = parseInt(cols[1]) || 0;
+                document.getElementById(`yeyak_${idx}`).value = parseInt(cols[2]) || 0;
+                document.getElementById(`pass_${idx}`).value  = parseInt(cols[5]) || parseInt(cols[4]) || 0;
             }
-        });
-        calcAllTotals(); 
-        document.getElementById('pasteArea').value = '';
-        alert("적용 완료! [EMR 서버(로컬) 저장] 버튼을 꼭 눌러주세요.");
+        }
+    });
+    calcAllTotals();
+    document.getElementById('pasteArea').value = '';
+    alert('적용 완료! [Google Sheets 저장] 버튼을 눌러주세요.');
+}
+
+// ════════════════════════════════════════════
+//  히트맵
+// ════════════════════════════════════════════
+async function runAnalysis() {
+    const start = document.getElementById('searchStart').value;
+    const end   = document.getElementById('searchEnd').value;
+    if (!start || !end || start > end) return alert('올바른 기간을 설정해주세요.');
+
+    const tbody = document.getElementById('heatmapBody');
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center; color:#64748b;">🔄 Google Sheets에서 데이터 불러오는 중...</td></tr>`;
+
+    let db;
+    try {
+        const result = await sheetsGet(start, end);
+        db = result.data || {};
+        Object.assign(localCache, db);
+    } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center; color:#ef4444;">⚠️ 불러오기 실패: ${e.message}</td></tr>`;
+        return;
     }
 
-    function runAnalysis() {
-        const startDate = document.getElementById('searchStart').value;
-        const endDate = document.getElementById('searchEnd').value;
+    const acc = {};
+    TIME_SLOTS.forEach(t => acc[t] = { susok:0, yeyak:0, pass:0 });
+    let sumS=0, sumY=0, sumP=0, hasData=false;
 
-        if(!startDate || !endDate || startDate > endDate) return alert("올바른 기간을 설정해주세요.");
-
-        const db = getDB();
-        let acc = {};
-        TIME_SLOTS.forEach(time => acc[time] = { susok: 0, yeyak: 0, pass: 0 });
-        
-        let hasData = false;
-        let sumS = 0, sumY = 0, sumP = 0; 
-
-        for(let date in db) {
-            if(date >= startDate && date <= endDate) {
-                hasData = true;
-                for(let time in db[date]) {
-                    if(acc[time] !== undefined) {
-                        acc[time].susok += (db[date][time].susok || 0);
-                        acc[time].yeyak += (db[date][time].yeyak || 0);
-                        acc[time].pass += (db[date][time].pass || 0);
-
-                        sumS += (db[date][time].susok || 0);
-                        sumY += (db[date][time].yeyak || 0);
-                        sumP += (db[date][time].pass || 0);
-                    }
-                }
+    for (const date in db) {
+        hasData = true;
+        for (const time in db[date]) {
+            if (acc[time] !== undefined) {
+                acc[time].susok += db[date][time].susok || 0;
+                acc[time].yeyak += db[date][time].yeyak || 0;
+                acc[time].pass  += db[date][time].pass  || 0;
+                sumS += db[date][time].susok || 0;
+                sumY += db[date][time].yeyak || 0;
+                sumP += db[date][time].pass  || 0;
             }
         }
-
-        const tbody = document.getElementById('heatmapBody');
-        const tfoot = document.getElementById('heatmapFoot');
-        tbody.innerHTML = '';
-
-        if(!hasData) {
-            tbody.innerHTML = `<tr><td colspan="8" style="color: #94a3b8; padding: 30px; text-align: center !important; padding-right: 0 !important;">해당 기간에 조회된 데이터가 없습니다.</td></tr>`;
-            tfoot.style.display = 'none';
-            return;
-        }
-
-        let totalIn = sumS + sumY;
-        let totalGrand = totalIn + sumP;
-        let maxSub = 0, maxInTotal = 0, maxTotal = 0;
-        
-        for(let time in acc) {
-            maxSub = Math.max(maxSub, acc[time].susok, acc[time].yeyak, acc[time].pass);
-            maxInTotal = Math.max(maxInTotal, acc[time].susok + acc[time].yeyak);
-            maxTotal = Math.max(maxTotal, acc[time].susok + acc[time].yeyak + acc[time].pass);
-        }
-
-        function getHeatmapCell(value, maxVal, type = 'normal') {
-            if(value === 0) return `<td style="color: #cbd5e0;">0</td>`; 
-            const intensity = maxVal > 0 ? value / maxVal : 0;
-            
-            let baseColor;
-            if (type === 'inTotal') baseColor = '59, 130, 246'; 
-            else if (type === 'total') baseColor = '239, 68, 68'; 
-            else baseColor = '245, 158, 11'; 
-
-            const bgColor = `rgba(${baseColor}, ${intensity * 0.85})`; 
-            const fontColor = intensity > 0.6 ? 'white' : '#334155';
-            return `<td style="background-color: ${bgColor}; color: ${fontColor}; font-weight: 800; transition: 0.3s;">${value}</td>`;
-        }
-
-        TIME_SLOTS.forEach(time => {
-            const data = acc[time];
-            let in_t = data.susok + data.yeyak;
-            let g_t = in_t + data.pass;
-
-            const inRatioStr = totalIn > 0 && in_t > 0 ? (in_t / totalIn * 100).toFixed(1) + '%' : '-';
-            const grandRatioStr = totalGrand > 0 && g_t > 0 ? (g_t / totalGrand * 100).toFixed(1) + '%' : '-';
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-weight:700; background:#f8fafc; font-size:12px; text-align:center !important; padding-right:0 !important;">${time}</td>
-                ${getHeatmapCell(data.susok, maxSub)}
-                ${getHeatmapCell(data.yeyak, maxSub)}
-                ${getHeatmapCell(in_t, maxInTotal, 'inTotal')}
-                <td style="font-weight:700; color:#3b82f6;">${inRatioStr}</td>
-                ${getHeatmapCell(data.pass, maxSub)}
-                ${getHeatmapCell(g_t, maxTotal, 'total')}
-                <td style="font-weight:700; color:#ef4444;">${grandRatioStr}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        document.getElementById('hm_sum_susok').innerText = sumS;
-        document.getElementById('hm_sum_yeyak').innerText = sumY;
-        document.getElementById('hm_sum_in_total').innerText = totalIn;
-        document.getElementById('hm_sum_pass').innerText = sumP;
-        document.getElementById('hm_sum_total').innerText = totalGrand;
-
-        if (totalGrand > 0) {
-            document.getElementById('hm_ratio_susok').innerText = (sumS / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('hm_ratio_yeyak').innerText = (sumY / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('hm_ratio_in_total').innerText = (totalIn / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('hm_ratio_pass').innerText = (sumP / totalGrand * 100).toFixed(1) + '%';
-            document.getElementById('hm_ratio_total').innerText = '100.0%';
-        }
-        
-        tfoot.style.display = 'table-footer-group';
     }
 
-    function runCharts() {
-        const startDate = document.getElementById('chartStart').value;
-        const endDate = document.getElementById('chartEnd').value;
+    tbody.innerHTML = '';
+    const tfoot = document.getElementById('heatmapFoot');
 
-        if(!startDate || !endDate || startDate > endDate) return alert("올바른 기간을 설정해주세요.");
+    if (!hasData) {
+        tbody.innerHTML = `<tr><td colspan="8" style="color:#94a3b8; padding:30px; text-align:center;">해당 기간에 데이터가 없습니다.</td></tr>`;
+        tfoot.style.display = 'none'; return;
+    }
 
-        const db = getDB();
-        let accTime = {}; 
-        TIME_SLOTS.forEach(time => accTime[time] = { susok: 0, yeyak: 0, pass: 0, total: 0 });
-        let accTask = { susok: 0, yeyak: 0, pass: 0 }; 
+    const totalIn = sumS + sumY, totalGrand = totalIn + sumP;
+    let maxSub=0, maxIn=0, maxTotal=0;
+    for (const t in acc) {
+        maxSub   = Math.max(maxSub,   acc[t].susok, acc[t].yeyak, acc[t].pass);
+        maxIn    = Math.max(maxIn,    acc[t].susok + acc[t].yeyak);
+        maxTotal = Math.max(maxTotal, acc[t].susok + acc[t].yeyak + acc[t].pass);
+    }
 
-        for(let date in db) {
-            if(date >= startDate && date <= endDate) {
-                for(let time in db[date]) {
-                    if(accTime[time] !== undefined) {
-                        accTime[time].susok += (db[date][time].susok || 0);
-                        accTime[time].yeyak += (db[date][time].yeyak || 0);
-                        accTime[time].pass += (db[date][time].pass || 0);
-                        accTime[time].total += ((db[date][time].susok || 0) + (db[date][time].yeyak || 0) + (db[date][time].pass || 0));
+    function hCell(v, max, type='normal') {
+        if (!v) return `<td style="color:#cbd5e0;">0</td>`;
+        const alpha = max > 0 ? v/max*0.85 : 0;
+        const rgb = type==='inTotal' ? '59,130,246' : type==='total' ? '239,68,68' : '245,158,11';
+        const fc  = alpha > 0.6 ? 'white' : '#334155';
+        return `<td style="background:rgba(${rgb},${alpha}); color:${fc}; font-weight:800;">${v}</td>`;
+    }
 
-                        accTask.susok += (db[date][time].susok || 0);
-                        accTask.yeyak += (db[date][time].yeyak || 0);
-                        accTask.pass += (db[date][time].pass || 0);
-                    }
-                }
-            }
+    TIME_SLOTS.forEach(time => {
+        const d = acc[time];
+        const in_t = d.susok + d.yeyak, g_t = in_t + d.pass;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight:700; background:#f8fafc; font-size:12px; text-align:center !important;">${time}</td>
+            ${hCell(d.susok,maxSub)} ${hCell(d.yeyak,maxSub)}
+            ${hCell(in_t,maxIn,'inTotal')}
+            <td style="font-weight:700; color:#3b82f6;">${totalIn>0&&in_t>0?(in_t/totalIn*100).toFixed(1)+'%':'-'}</td>
+            ${hCell(d.pass,maxSub)}
+            ${hCell(g_t,maxTotal,'total')}
+            <td style="font-weight:700; color:#ef4444;">${totalGrand>0&&g_t>0?(g_t/totalGrand*100).toFixed(1)+'%':'-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('hm_sum_susok').innerText    = sumS;
+    document.getElementById('hm_sum_yeyak').innerText    = sumY;
+    document.getElementById('hm_sum_in_total').innerText = totalIn;
+    document.getElementById('hm_sum_pass').innerText     = sumP;
+    document.getElementById('hm_sum_total').innerText    = totalGrand;
+    if (totalGrand > 0) {
+        document.getElementById('hm_ratio_susok').innerText    = (sumS/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('hm_ratio_yeyak').innerText    = (sumY/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('hm_ratio_in_total').innerText = (totalIn/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('hm_ratio_pass').innerText     = (sumP/totalGrand*100).toFixed(1)+'%';
+        document.getElementById('hm_ratio_total').innerText    = '100.0%';
+    }
+    tfoot.style.display = 'table-footer-group';
+}
+
+// ════════════════════════════════════════════
+//  그래프
+// ════════════════════════════════════════════
+async function runCharts() {
+    const start = document.getElementById('chartStart').value;
+    const end   = document.getElementById('chartEnd').value;
+    if (!start || !end || start > end) return alert('올바른 기간을 설정해주세요.');
+
+    let db;
+    try {
+        const result = await sheetsGet(start, end);
+        db = result.data || {};
+    } catch(e) {
+        alert('데이터 불러오기 실패: ' + e.message); return;
+    }
+
+    const accT = {};
+    TIME_SLOTS.forEach(t => accT[t] = {susok:0, yeyak:0, pass:0, total:0});
+    const accK = {susok:0, yeyak:0, pass:0};
+
+    for (const date in db) {
+        for (const time in db[date]) {
+            if (!accT[time]) continue;
+            const d = db[date][time];
+            accT[time].susok += d.susok||0; accT[time].yeyak += d.yeyak||0; accT[time].pass += d.pass||0;
+            accT[time].total += (d.susok||0)+(d.yeyak||0)+(d.pass||0);
+            accK.susok += d.susok||0; accK.yeyak += d.yeyak||0; accK.pass += d.pass||0;
         }
-
-        const ctxTime = document.getElementById('timeChart').getContext('2d');
-        if(timeChartInstance) timeChartInstance.destroy(); 
-        
-        timeChartInstance = new Chart(ctxTime, {
-            type: 'bar',
-            data: {
-                labels: TIME_SLOTS.map(t => t.split(' - ')[0]), 
-                datasets: [
-                    {
-                        type: 'line',
-                        label: '전체 대기인원(총합)',
-                        data: TIME_SLOTS.map(t => accTime[t].total),
-                        borderColor: '#ff8b94', backgroundColor: '#ff8b94',
-                        borderWidth: 2, fill: false, tension: 0.3 
-                    },
-                    { type: 'bar', label: '입원수속', data: TIME_SLOTS.map(t => accTime[t].susok), backgroundColor: '#a2c2e6', stack: 'Stack 0' },
-                    { type: 'bar', label: '입원예약', data: TIME_SLOTS.map(t => accTime[t].yeyak), backgroundColor: '#b5eada', stack: 'Stack 0' },
-                    { type: 'bar', label: '출입증', data: TIME_SLOTS.map(t => accTime[t].pass), backgroundColor: '#fce4b6', stack: 'Stack 0' }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
-        });
-
-        const ctxTask = document.getElementById('taskChart').getContext('2d');
-        if(taskChartInstance) taskChartInstance.destroy();
-
-        taskChartInstance = new Chart(ctxTask, {
-            type: 'doughnut',
-            data: {
-                labels: ['입원수속', '입원예약', '출입증'],
-                datasets: [{
-                    data: [accTask.susok, accTask.yeyak, accTask.pass],
-                    backgroundColor: ['#a2c2e6', '#b5eada', '#fce4b6'],
-                    borderWidth: 1
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-        });
     }
 
-    function printReport() {
-        const selectedDate = document.getElementById('inputDate').value;
-        if(selectedDate) {
-            const dateObj = new Date(selectedDate);
-            const formattedDate = `${dateObj.getFullYear()}. ${String(dateObj.getMonth() + 1).padStart(2, '0')}. ${String(dateObj.getDate()).padStart(2, '0')}.`;
-            document.getElementById('printDateDisplay').innerText = `(기준일: ${formattedDate}, 단위: 명)`;
-        } else {
-            document.getElementById('printDateDisplay').innerText = `(기준일: 미지정, 단위: 명)`;
-        }
-        window.print();
-    }
+    if (timeChartInstance) timeChartInstance.destroy();
+    timeChartInstance = new Chart(document.getElementById('timeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: TIME_SLOTS.map(t => t.split(' - ')[0]),
+            datasets: [
+                { type:'line', label:'전체 대기인원(총합)', data: TIME_SLOTS.map(t=>accT[t].total), borderColor:'#ff8b94', backgroundColor:'#ff8b94', borderWidth:2, fill:false, tension:0.3 },
+                { type:'bar', label:'입원수속', data:TIME_SLOTS.map(t=>accT[t].susok), backgroundColor:'#a2c2e6', stack:'s' },
+                { type:'bar', label:'입원예약', data:TIME_SLOTS.map(t=>accT[t].yeyak), backgroundColor:'#b5eada', stack:'s' },
+                { type:'bar', label:'출입증',   data:TIME_SLOTS.map(t=>accT[t].pass),  backgroundColor:'#fce4b6', stack:'s' }
+            ]
+        },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{stacked:true}, y:{stacked:true, beginAtZero:true} } }
+    });
 
-    // 알림창 동적 색상 변경 기능 추가
-    function showToast(message = "저장되었습니다!", bgColor = "#10b981") {
-        const toast = document.getElementById('toast');
-        toast.innerText = message;
-        toast.style.background = bgColor;
-        toast.style.display = 'block';
-        setTimeout(() => toast.style.display = 'none', 2000);
+    if (taskChartInstance) taskChartInstance.destroy();
+    taskChartInstance = new Chart(document.getElementById('taskChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['입원수속','입원예약','출입증'],
+            datasets: [{ data:[accK.susok, accK.yeyak, accK.pass], backgroundColor:['#a2c2e6','#b5eada','#fce4b6'], borderWidth:1 }]
+        },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
+    });
+}
+
+// ════════════════════════════════════════════
+//  인쇄 / 기타
+// ════════════════════════════════════════════
+function printReport() {
+    const date = document.getElementById('inputDate').value;
+    if (date) {
+        const d = new Date(date);
+        document.getElementById('printDateDisplay').innerText =
+            `(기준일: ${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2,'0')}. ${String(d.getDate()).padStart(2,'0')}., 단위: 명)`;
     }
+    window.print();
+}
+
+function showToast(msg, bg = '#10b981') {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.style.background = bg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2500);
+}
 </script>
 </body>
 </html>
