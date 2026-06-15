@@ -78,27 +78,27 @@
         .hospital-footer { text-align:center; margin-top:30px; padding-top:18px; border-top:1px solid var(--border); color:#64748b; font-size:13px; line-height:1.6; margin-left:28px; margin-right:28px; }
         .print-only-header { display:none; }
         @media print {
-            @page{size:A4 portrait;margin:25mm 10mm 20mm 10mm;}
+            @page{size:A4 portrait;margin:18mm 8mm 12mm 8mm;}
             body{background:white;padding:0;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
             #appContainer{display:block !important;box-shadow:none;border-radius:0;width:100%;max-width:100%;margin:0;padding:0 !important;}
             .header,#syncBanner,.tabs,.split-layout>div:first-child,.btn-print,#toast,#tab2,#tab3,#tab4{display:none !important;}
             .split-layout{display:block;width:100%;}
             .content{padding:0;width:100%;}
             h3,.nav-hint,.hospital-footer{display:none !important;}
-            .print-only-header{display:block;position:relative;width:100%;height:25mm;margin-bottom:15px;}
+            .print-only-header{display:block;position:relative;width:100%;height:22mm;margin-bottom:8px;}
             .title-area{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;}
-            .title-area h1{font-size:22px;margin:0 0 5px 0;}
-            .title-area p{font-size:12px;color:#333;margin:0;font-weight:bold;}
-            .approval-area{position:absolute;right:0;top:0;width:55mm;height:20mm;}
-            .approval-table{width:55mm;height:20mm;border-collapse:collapse;border:2px solid #000;background:white;margin:0;table-layout:fixed;}
+            .title-area h1{font-size:20px;margin:0 0 4px 0;}
+            .title-area p{font-size:11px;color:#333;margin:0;font-weight:bold;}
+            .approval-area{position:absolute;right:0;top:0;width:55mm;height:18mm;}
+            .approval-table{width:55mm;height:18mm;border-collapse:collapse;border:2px solid #000;background:white;margin:0;table-layout:fixed;}
             .approval-table th,.approval-table td{border:1px solid #000;padding:0;color:#000;text-align:center;}
-            .approval-table th{background-color:#f4f4f4 !important;font-weight:bold;height:8mm;font-size:13px !important;}
-            .approval-table td{height:12mm;}
+            .approval-table th{background-color:#f4f4f4 !important;font-weight:bold;height:7mm;font-size:12px !important;}
+            .approval-table td{height:11mm;}
             .sign-th{width:10mm !important;letter-spacing:2px;}
             #inputGrid{border:2px solid #000;width:100%;table-layout:fixed;}
-            #inputGrid th,#inputGrid tfoot td{background-color:#f0f0f0 !important;font-weight:bold;border:1px solid #444;color:#000;padding:5px 1px !important;font-size:9.5pt !important;}
-            #inputGrid td{border:1px solid #444;color:#000;font-size:10pt !important;padding:5px 1px !important;}
-            td input[type="text"],td input[type="number"]{background:transparent !important;border:none !important;color:#000 !important;font-size:10pt !important;font-weight:bold;padding-right:10px !important;text-align:right !important;width:100%;box-sizing:border-box;}
+            #inputGrid th,#inputGrid tfoot td{background-color:#f0f0f0 !important;font-weight:bold;border:1px solid #444;color:#000;padding:2px 1px !important;font-size:8pt !important;letter-spacing:-0.3px;line-height:1.2;}
+            #inputGrid td{border:1px solid #444;color:#000;font-size:8.5pt !important;padding:2px 1px !important;}
+            td input[type="text"],td input[type="number"]{background:transparent !important;border:none !important;color:#000 !important;font-size:8.5pt !important;font-weight:bold;padding-right:8px !important;text-align:right !important;width:100%;box-sizing:border-box;}
         }
     </style>
 </head>
@@ -160,7 +160,8 @@
                     <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelUpload(event)">
                     <div class="upload-hint">
                         · H열(발급시간) 기준으로 30분 슬롯 자동 배분<br>
-                        · 입원수속 / 입원예약 / 출입증 자동 분류<br>
+                        · 08:30 이전 발급 → 08:30~09:00 슬롯에 포함<br>
+                        · 17:30 이후 발급 → 17:30 이후 슬롯에 포함<br>
                         · 날짜가 여러 개면 선택 후 그리드에 적용
                     </div>
                     <!-- 날짜 선택 + 프리뷰 -->
@@ -337,10 +338,12 @@ const SCRIPT_URL      = 'https://script.google.com/macros/s/AKfycbxDGSkbJaVnsAHl
 const SYSTEM_PASSWORD = '4114';
 
 const TIME_SLOTS = [
+    '08:30 - 09:00',                                                    // ★ 추가 (08:30 이전도 여기 포함)
     '09:00 - 09:30','09:30 - 10:00','10:00 - 10:30','10:30 - 11:00',
     '11:00 - 11:30','11:30 - 12:00','12:00 - 12:30','12:30 - 13:00',
     '13:00 - 13:30','13:30 - 14:00','14:00 - 14:30','14:30 - 15:00',
-    '15:00 - 15:30','15:30 - 16:00','16:00 - 16:30','16:30 - 17:00','17:00 - 17:30'
+    '15:00 - 15:30','15:30 - 16:00','16:00 - 16:30','16:30 - 17:00','17:00 - 17:30',
+    '17:30 이후'                                                         // ★ 추가
 ];
 const EDITABLE_COLS = ['susok','yeyak','pass'];
 const DOW_LABELS = ['일','월','화','수','목','금','토'];
@@ -493,10 +496,14 @@ function timeToSlot(timeStr) {
     if (parts.length < 2) return null;
     const h = parseInt(parts[0]), m = parseInt(parts[1]);
     if (isNaN(h)||isNaN(m)) return null;
-    const total   = h * 60 + m;
+    const total = h * 60 + m;
+    // 09:00 이전(08:30 이전 포함) → 첫 슬롯
+    if (total < 9*60) return '08:30 - 09:00';
+    // 17:30 이후 → 마지막 슬롯
+    if (total >= 17*60 + 30) return '17:30 이후';
+    // 09:00 ~ 17:29 → 30분 단위 슬롯 (TIME_SLOTS[1]~[17])
     const slotIdx = Math.floor((total - 9*60) / 30);
-    if (slotIdx < 0 || slotIdx >= TIME_SLOTS.length) return null;
-    return TIME_SLOTS[slotIdx];
+    return TIME_SLOTS[slotIdx + 1]; // +1: 인덱스 0이 '08:30 - 09:00'이므로
 }
 
 function showUploadPreview(skippedTime, skippedType, unknownTypes) {
@@ -522,7 +529,7 @@ function showUploadPreview(skippedTime, skippedType, unknownTypes) {
 
     // 스킵 안내
     let skipMsg = '';
-    if (skippedTime > 0) skipMsg += `⏰ 09:00 이전/17:30 이후 제외: ${skippedTime}건 `;
+    if (skippedTime > 0) skipMsg += `⏰ 시간 파싱 불가(무효값) 제외: ${skippedTime}건 `;
     if (skippedType > 0) skipMsg += `❓ 미지원 사유(${[...unknownTypes].join(',')}) 제외: ${skippedType}건`;
     document.getElementById('previewSkipped').innerText = skipMsg;
 
