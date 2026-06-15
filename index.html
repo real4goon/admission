@@ -118,17 +118,24 @@
             /* ── TAB 3 시간대 그래프 인쇄 ── */
             body[data-ptab="3"] #tab3{display:block !important;}
             body[data-ptab="3"] .print-only-header{display:none !important;}
-            body[data-ptab="3"] #tab3>div:first-child{display:none !important;}
+            body[data-ptab="3"] #tab3>div:nth-child(2){display:none !important;}
             body[data-ptab="3"] .tab-print-title{display:block !important;}
-            body[data-ptab="3"] #tab3>div:last-child{display:grid !important;grid-template-columns:2fr 1fr;gap:10px;}
+            body[data-ptab="3"] #tab3>div:last-child{display:grid !important;grid-template-columns:2fr 1fr;gap:10px;page-break-inside:avoid;break-inside:avoid;}
             body[data-ptab="3"] canvas{max-height:260px !important;}
             body[data-ptab="3"] .btn-print-tab{display:none !important;}
             /* ── TAB 4 요일별 인쇄 ── */
             body[data-ptab="4"] #tab4{display:block !important;}
             body[data-ptab="4"] .print-only-header{display:none !important;}
-            body[data-ptab="4"] #tab4>div:first-child{display:none !important;}
+            body[data-ptab="4"] #tab4>div:nth-child(2){display:none !important;}
             body[data-ptab="4"] .tab-print-title{display:block !important;}
-            body[data-ptab="4"] canvas{max-height:220px !important;}
+            body[data-ptab="4"] #tab4>div:nth-child(3){
+                display:grid !important;grid-template-columns:1fr 1fr !important;
+                gap:8px !important;margin-top:8px !important;
+                page-break-inside:avoid !important;break-inside:avoid !important;
+            }
+            body[data-ptab="4"] #tab4>div:nth-child(3)>div{page-break-inside:avoid !important;break-inside:avoid !important;}
+            body[data-ptab="4"] canvas{max-height:190px !important;}
+            body[data-ptab="4"] #tab4>div:nth-child(4){page-break-inside:avoid !important;break-inside:avoid !important;margin-top:8px !important;}
             body[data-ptab="4"] #dowTable th{font-size:8pt !important;padding:3px 2px !important;}
             body[data-ptab="4"] #dowTable td{font-size:8.5pt !important;padding:3px 2px !important;}
             body[data-ptab="4"] .btn-print-tab{display:none !important;}
