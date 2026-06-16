@@ -285,6 +285,38 @@
                         </tr>
                     </tfoot>
                 </table>
+                <!-- ★ 원무상담 섹션 (인쇄 시 자동 숨김) -->
+                <div class="wmsd-toggle-area">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:700;color:#713f12;">
+                        <input type="checkbox" id="wmsdToggle" onchange="toggleWmsd()" style="width:14px;height:14px;">
+                        🟡 원무상담 포함 표시
+                        <span style="font-size:11px;color:#64748b;font-weight:normal;">(기본: 제외 — 입원업무 총합계에 미포함)</span>
+                    </label>
+                </div>
+                <div class="wmsd-section" id="wmsdSection">
+                    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:12px;margin-top:8px;">
+                        <div style="font-size:12px;font-weight:800;color:#713f12;margin-bottom:8px;">
+                            🟡 원무상담 건수 — 별도 집계 (입원수속·예약·출입증 합계에 포함되지 않음)
+                        </div>
+                        <table id="wmsdTable" style="width:50%;min-width:300px;border-collapse:collapse;text-align:center;">
+                            <thead><tr>
+                                <th style="background:#fef08a;padding:6px 4px;border:1px solid #fde047;font-size:12px;width:45%;">구분(시간)</th>
+                                <th style="background:#fef08a;padding:6px 4px;border:1px solid #fde047;font-size:12px;width:30%;">원무상담(건)</th>
+                                <th style="background:#fef08a;padding:6px 4px;border:1px solid #fde047;font-size:12px;width:25%;">구성비(%)</th>
+                            </tr></thead>
+                            <tbody id="wmsdBody">
+                                <tr><td colspan="3" style="padding:8px;color:#94a3b8;font-size:12px;">데이터 없음 (KIOSK 파일 업로드 시 자동 반영)</td></tr>
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#fef08a;font-weight:bold;">
+                                    <td style="padding:6px 4px;border:1px solid #fde047;font-size:12px;">합계</td>
+                                    <td id="wmsd_sum" style="padding:6px 4px;border:1px solid #fde047;font-size:13px;color:#713f12;">0</td>
+                                    <td style="padding:6px 4px;border:1px solid #fde047;font-size:12px;">100%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1159,6 +1191,8 @@ function toggleWmsd() {
 
 function updateWmsdTable() {
     const tbody = document.getElementById('wmsdBody');
+    const sumEl = document.getElementById('wmsd_sum');
+    if (!tbody || !sumEl) return;   // DOM 미준비 안전 체크
     const entries = TIME_SLOTS.map(t => ({ time: t, cnt: wmsdCurrentData[t] || 0 }))
                                .filter(e => e.cnt > 0);
     const total = entries.reduce((s, e) => s + e.cnt, 0);
@@ -1171,7 +1205,7 @@ function updateWmsdTable() {
             <td style="padding:5px 4px;border:1px solid #fde047;font-size:12px;">${total>0?(e.cnt/total*100).toFixed(1)+'%':'-'}</td>
         </tr>`).join('');
     }
-    document.getElementById('wmsd_sum').innerText = total;
+    sumEl.innerText = total;
 }
 
 // ══════════════════════════════════════════
