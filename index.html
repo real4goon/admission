@@ -604,6 +604,10 @@
                     <input type="checkbox" id="excludeLeave" style="width:14px;height:14px;">
                     <label for="excludeLeave" style="font-size:13px;font-weight:600;color:#475569;cursor:pointer;">연차 일자 제외</label>
                 </div>
+                <div style="display:flex;align-items:center;gap:6px;padding-bottom:2px;">
+                    <input type="checkbox" id="excludeWeekend" style="width:14px;height:14px;">
+                    <label for="excludeWeekend" style="font-size:13px;font-weight:600;color:#475569;cursor:pointer;">주말 제외 (토·일)</label>
+                </div>
                 <button class="btn btn-primary" onclick="runEmpAnalysis()" style="padding:8px 20px;">분석 실행</button>
                 <button class="btn-print-tab" onclick="printSection(6)">🖨 인쇄</button>
             </div>
@@ -1770,7 +1774,8 @@ function runEmpAnalysis() {
     const end   = document.getElementById('empEnd').value;
     if (!start||!end||start>end) return alert('올바른 기간을 설정해주세요.');
 
-    const excludeLeave = document.getElementById('excludeLeave').checked;
+    const excludeLeave   = document.getElementById('excludeLeave').checked;
+    const excludeWeekend = document.getElementById('excludeWeekend').checked;
     const selectedEmps = Array.from(document.querySelectorAll('#empFilter input:checked')).map(c=>c.value);
     if (selectedEmps.length===0) return alert('직원을 1명 이상 선택하세요.');
 
@@ -1793,6 +1798,8 @@ function runEmpAnalysis() {
 
         selectedEmps.forEach(emp => {
             if (!allEmpData[date]||!allEmpData[date][emp]) return;
+            // 주말 제외
+            if (excludeWeekend && (dow===0||dow===6)) return;
             const leave = (allLeaveData[emp]||[]).find(l=>l.date===date);
 
             TIME_SLOTS.forEach(slot => {
@@ -1824,7 +1831,7 @@ function runEmpAnalysis() {
         const t = empTotals[emp];
         const tot = t.susok+t.yeyak+t.pass;
         const days = t.days.size;
-        const leaveDays = calcLeaveDays(emp, start, end, excludeLeave);
+        const leaveDays = calcLeaveDays(emp, start, end, excludeLeave, excludeWeekend);
         const avg = days>0 ? (tot/days).toFixed(1) : 0;
         return `<div class="emp-stat-box">
             <div class="emp-stat-label">${emp}</div>
@@ -1913,7 +1920,7 @@ function runEmpAnalysis() {
     const tbody = document.getElementById('empDetailBody');
     tbody.innerHTML = selectedEmps.map(emp => {
         const t=empTotals[emp], tot=t.susok+t.yeyak+t.pass;
-        const days=t.days.size, lv=calcLeaveDays(emp,start,end,excludeLeave);
+        const days=t.days.size, lv=calcLeaveDays(emp,start,end,excludeLeave,excludeWeekend);
         const avg = days>0?(tot/days).toFixed(1):0;
         return `<tr>
             <td style="padding:7px 8px;border:1px solid var(--border);font-weight:700;">${emp}</td>
@@ -1929,9 +1936,15 @@ function runEmpAnalysis() {
     }).join('');
 }
 
-function calcLeaveDays(emp, start, end, excludeLeave) {
+function calcLeaveDays(emp, start, end, excludeLeave, excludeWeekend) {
     if (!excludeLeave || !allLeaveData[emp]) return 0;
-    return allLeaveData[emp].filter(l => l.date>=start && l.date<=end)
+    return allLeaveData[emp]
+        .filter(l => l.date>=start && l.date<=end)
+        .filter(l => {
+            if (!excludeWeekend) return true;
+            const dow = new Date(l.date).getDay();
+            return dow!==0 && dow!==6; // 주말 연차는 제외 계산에서도 빠짐
+        })
         .reduce((s,l) => s + (l.type==='전일' ? 1 : 0.5), 0);
 }
 
