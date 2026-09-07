@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>입원계 업무 현황 v9</title>
+    <title>입원계 업무 현황 v10</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -91,12 +91,34 @@
         .month-stat-box { background:white; border:1px solid var(--border); border-radius:8px; padding:18px; }
         #tab5 .year-sel { padding:9px 12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:14px; }
 
+
+        /* ── v10 직원별 분석 ── */
+        .tab-btn-lock { background:#334155; color:#94a3b8; font-size:13px; }
+        .tab-btn-lock:hover { background:#475569; color:white; }
+        .tab-btn-lock.unlocked { color:#fbbf24; }
+        .emp-section { background:white; border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:16px; }
+        .emp-section-title { font-size:14px; font-weight:800; color:var(--primary); margin-bottom:14px; display:flex; align-items:center; gap:6px; }
+        .leave-chip { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:14px; font-size:12px; font-weight:600; margin:3px; }
+        .leave-full { background:#fee2e2; color:#991b1b; }
+        .leave-am   { background:#fef3c7; color:#92400e; }
+        .leave-pm   { background:#dbeafe; color:#1e40af; }
+        .leave-del  { background:none; border:none; cursor:pointer; font-size:14px; color:#94a3b8; padding:0 2px; }
+        .leave-del:hover { color:var(--danger); }
+        .emp-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+        .emp-stat-box { background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:12px; text-align:center; }
+        .emp-stat-label { font-size:11px; color:#64748b; font-weight:600; margin-bottom:4px; }
+        .emp-stat-value { font-size:20px; font-weight:800; color:var(--primary); }
+        .emp-stat-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+        .emp-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; margin:2px; cursor:pointer; border:2px solid transparent; }
+        .emp-tag.active { border-color:var(--accent); }
+        .upload-progress { font-size:12px; color:var(--green); margin-top:6px; font-weight:700; display:none; }
+
         @media print {
             @page{size:A4 portrait;margin:22mm 10mm 18mm 10mm;}
             body{background:white;padding:0;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
             #appContainer{display:block !important;box-shadow:none;border-radius:0;width:100%;max-width:100%;margin:0;padding:0 !important;}
             /* 공통: 항상 숨김 */
-            .header,#syncBanner,.tabs,.hospital-footer,#toast,.btn-print,.upload-section,.nav-hint,.wmsd-toggle-area,.wmsd-section,.export-btn,.auto-save-row,.dirty-badge{display:none !important;}
+            .header,#syncBanner,.tabs,.hospital-footer,#toast,.btn-print,.upload-section,.nav-hint,.wmsd-toggle-area,.wmsd-section,.export-btn,.auto-save-row,.dirty-badge,#tab6{display:none !important;}
             .content{display:none !important;}
             /* ── TAB 1 기본 인쇄 ── */
             body:not([data-ptab]) #tab1,
@@ -159,6 +181,13 @@
             body[data-ptab="5"] .tab-print-title{display:block !important;}
             body[data-ptab="5"] canvas{max-height:220px !important;}
             body[data-ptab="5"] .btn-print-tab,.export-btn{display:none !important;}
+            /* ── TAB 6 직원별 분석 인쇄 ── */
+            body[data-ptab="6"] #tab6{display:block !important;}
+            body[data-ptab="6"] .emp-section:first-child{display:none !important;}
+            body[data-ptab="6"] .emp-section:nth-child(2){display:none !important;}
+            body[data-ptab="6"] .tab-print-title{display:block !important;}
+            body[data-ptab="6"] canvas{max-height:200px !important;}
+            body[data-ptab="6"] .emp-stat-grid{grid-template-columns:repeat(3,1fr) !important;}
             /* 공통: 탭 인쇄 타이틀 */
             .tab-print-title{display:none;text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #1e293b;}
             .tab-print-title h2{font-size:16px;margin:0 0 3px 0;color:#1e293b;}
@@ -170,7 +199,7 @@
 <div id="appContainer">
     <div class="header">
         <h2>🏥 입원계 업무 현황</h2>
-        <p>v9 · 미저장경고 · 원무상담 · 월별통계 · 엑셀내보내기</p>
+        <p>v10 · 직원별 분석 (관리자 전용)</p>
     </div>
     <div id="syncBanner" class="loading">
         <span class="sync-dot blink"></span>
@@ -182,6 +211,7 @@
         <button class="tab-btn" id="tabBtn3" onclick="switchTab(3)">📈 시간대 그래프</button>
         <button class="tab-btn" id="tabBtn4" onclick="switchTab(4)">📅 요일별 분석</button>
         <button class="tab-btn" id="tabBtn5" onclick="switchTab(5)">📆 월별 통계</button>
+        <button class="tab-btn tab-btn-lock" id="tabBtn6" onclick="switchTab(6)">🔒 직원별 분석</button>
     </div>
 
     <!-- TAB 1: 일자별 입력 -->
@@ -502,6 +532,132 @@
         </div>
     </div>
 
+    <!-- TAB 6: 직원별 분석 (관리자 전용) -->
+    <div id="tab6" class="content">
+        <div class="tab-print-title"><h2>입원계 업무 현황 — 직원별 분석</h2><p id="empPrintPeriod">기간: </p></div>
+
+        <!-- ① 이력 데이터 업로드 -->
+        <div class="emp-section">
+            <div class="emp-section-title">📂 직원별 이력 데이터 업로드
+                <span style="font-size:11px;color:#64748b;font-weight:400;">(KIOSK Excel → 직원별 데이터 Sheets 저장)</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <label style="background:#7c3aed;color:white;padding:8px 14px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;" for="empExcelInput">
+                    📎 KIOSK Excel 파일 선택
+                </label>
+                <input type="file" id="empExcelInput" accept=".xlsx,.xls" onchange="handleEmpExcelUpload(event)" style="display:none;">
+                <span id="empUploadStatus" style="font-size:12px;color:#64748b;"></span>
+            </div>
+            <div id="empUploadProgress" class="upload-progress"></div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.7;">
+                · K열(호출자) 기준으로 직원별 건수 자동 추출 · 저장 후 누적 분석 가능<br>
+                · 앞으로 Tab 1 업로드 시 직원 데이터도 자동 저장됩니다
+            </div>
+        </div>
+
+        <!-- ② 연차 관리 -->
+        <div class="emp-section">
+            <div class="emp-section-title">🗓 연차 관리
+                <span style="font-size:11px;color:#64748b;font-weight:400;">(전일/반차 입력 — 분석 시 제외 가능)</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">직원</label>
+                    <select id="leaveEmp" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;min-width:120px;">
+                        <option value="">직원 선택</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">날짜</label>
+                    <input type="date" id="leaveDate" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">유형</label>
+                    <select id="leaveType" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;">
+                        <option value="전일">전일 연차</option>
+                        <option value="반차(오전)">반차 (오전)</option>
+                        <option value="반차(오후)">반차 (오후)</option>
+                    </select>
+                </div>
+                <button class="btn btn-green" onclick="addLeave()" style="padding:8px 16px;">추가</button>
+            </div>
+            <div id="leaveList" style="font-size:12px;color:#94a3b8;">연차 데이터 없음</div>
+        </div>
+
+        <!-- ③ 분석 조회 -->
+        <div class="emp-section">
+            <div class="emp-section-title">📊 직원별 업무량 분석</div>
+            <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">시작일</label>
+                    <input type="date" id="empStart">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">종료일</label>
+                    <input type="date" id="empEnd">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">직원 선택</label>
+                    <div id="empFilter" style="display:flex;gap:4px;flex-wrap:wrap;padding:4px 0;"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;padding-bottom:2px;">
+                    <input type="checkbox" id="excludeLeave" style="width:14px;height:14px;">
+                    <label for="excludeLeave" style="font-size:13px;font-weight:600;color:#475569;cursor:pointer;">연차 일자 제외</label>
+                </div>
+                <button class="btn btn-primary" onclick="runEmpAnalysis()" style="padding:8px 20px;">분석 실행</button>
+                <button class="btn-print-tab" onclick="printSection(6)">🖨 인쇄</button>
+            </div>
+
+            <!-- 요약 통계 카드 -->
+            <div id="empStatGrid" class="emp-stat-grid" style="display:none;"></div>
+
+            <!-- 차트 -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">🏆 직원별 총 업무량 비교</div>
+                    <canvas id="empCompareChart" style="max-height:250px;"></canvas>
+                </div>
+                <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">🥧 사유별 구성 비중</div>
+                    <canvas id="empDonutChart" style="max-height:250px;"></canvas>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">⏰ 시간대별 처리건수</div>
+                    <canvas id="empTimeChart" style="max-height:280px;"></canvas>
+                </div>
+                <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:16px;">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">📅 요일별 처리건수</div>
+                    <canvas id="empDOWChart" style="max-height:280px;"></canvas>
+                </div>
+            </div>
+
+            <!-- 상세 테이블 -->
+            <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:16px;">
+                <div style="font-size:13px;font-weight:700;margin-bottom:10px;">📋 직원별 상세 집계표</div>
+                <div style="overflow-x:auto;">
+                <table id="empDetailTable" style="width:100%;border-collapse:collapse;text-align:center;font-size:13px;">
+                    <thead><tr>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">직원</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">조회일수</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">연차(일)</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">실근무일</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">입원수속</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">입원예약</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">출입증</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">총합계</th>
+                        <th style="background:#1e293b;color:white;padding:9px 8px;border:1px solid #444;">일평균</th>
+                    </tr></thead>
+                    <tbody id="empDetailBody">
+                        <tr><td colspan="9" style="padding:30px;color:#94a3b8;">분석 실행 버튼을 눌러주세요.</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="hospital-footer">
         <strong>한림대학교성심병원 원무팀</strong><br>
         * 자료 무단 반출 및 데이터 훼손시 법적 처벌받을 수 있습니다.
@@ -534,6 +690,14 @@ let calPicker = null;
 let parsedExcelData = {};
 let selectedExcelDate = '';
 let isDirty = false;           // 미저장 변경 여부
+let tab6Unlocked = false;       // 직원별 분석 탭 잠금
+let allEmpData  = {};           // { date: { emp: { time: {susok,yeyak,pass,wmsd} } } }
+let allLeaveData = {};          // { emp: [ {date,type} ] }
+let parsedEmpData = {};         // 업로드 후 임시 저장
+let empChartCompare = null, empChartDonut = null, empChartTime = null, empChartDOW = null;
+const EMP_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+const AM_SLOTS = ['08:30 - 09:00','09:00 - 09:30','09:30 - 10:00','10:00 - 10:30',
+                  '10:30 - 11:00','11:00 - 11:30','11:30 - 12:00','12:00 - 12:30','12:30 - 13:00'];
 let wmsdCurrentData = {};      // 현재 날짜 원무상담 건수 { timeSlot: count }
 let lastHeatmapAcc = null;     // 히트맵 마지막 결과 (엑셀 내보내기용)
 let lastDOWResult = null;      // 요일별 마지막 결과 (엑셀 내보내기용)
@@ -634,6 +798,7 @@ function parseKioskRows(rows) {
     const dateIdx  = headers.indexOf('일자');
     const sauIdx   = headers.indexOf('사유');
     const timeIdx  = headers.indexOf('발급시간');
+    const empIdx   = headers.indexOf('호출자');   // K열
 
     if (dateIdx<0||sauIdx<0||timeIdx<0) return alert('필수 컬럼(일자/사유/발급시간)을 찾을 수 없습니다.');
 
@@ -679,6 +844,16 @@ function parseKioskRows(rows) {
         if (!parsedExcelData[dateStr]) parsedExcelData[dateStr] = {};
         if (!parsedExcelData[dateStr][slot]) parsedExcelData[dateStr][slot] = {susok:0,yeyak:0,pass:0,wmsd:0};
         parsedExcelData[dateStr][slot][field]++;
+        // 호출자별 데이터 추가 파싱
+        if (empIdx >= 0) {
+            const emp = String(row[empIdx] || '').trim();
+            if (emp) {
+                if (!parsedEmpData[dateStr]) parsedEmpData[dateStr] = {};
+                if (!parsedEmpData[dateStr][emp]) parsedEmpData[dateStr][emp] = {};
+                if (!parsedEmpData[dateStr][emp][slot]) parsedEmpData[dateStr][emp][slot] = {susok:0,yeyak:0,pass:0,wmsd:0};
+                parsedEmpData[dateStr][emp][slot][field]++;
+            }
+        }
     }
 
     showUploadPreview(skippedTime, skippedType, unknownTypes);
@@ -769,6 +944,10 @@ async function applyParsedToGrid() {
     calcAllTotals();
     document.getElementById('uploadPreview').style.display = 'none';
 
+    // 직원별 데이터도 저장 (parsedEmpData에 있으면)
+    if (parsedEmpData[selectedExcelDate] && Object.keys(parsedEmpData[selectedExcelDate]).length > 0) {
+        saveEmpDataBatch(selectedExcelDate, parsedEmpData[selectedExcelDate]);
+    }
     // 자동저장 체크 확인
     if (document.getElementById('autoSaveChk').checked) {
         showToast('자동저장 중...', '#7c3aed');
@@ -902,6 +1081,19 @@ function runDOWCharts() {
 //  탭 전환
 // ══════════════════════════════════════════
 function switchTab(n) {
+    if (n === 6) {
+        if (!tab6Unlocked) {
+            const pw = prompt('🔒 관리자 전용 탭입니다.\n비밀번호를 입력하세요:');
+            if (pw !== '4040') {
+                if (pw !== null) alert('비밀번호가 올바르지 않습니다.');
+                return;
+            }
+            tab6Unlocked = true;
+            document.getElementById('tabBtn6').classList.add('unlocked');
+            document.getElementById('tabBtn6').textContent = '🔓 직원별 분석';
+            loadEmpData();   // 최초 진입 시 데이터 로드
+        }
+    }
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
     document.getElementById('tabBtn'+n).classList.add('active');
@@ -1372,6 +1564,377 @@ function exportMonthlyExcel() {
     exportExcel(rows, `월별통계_${year}.xlsx`);
 }
 
+
+// ══════════════════════════════════════════
+//  직원별 분석 — 데이터 로드/저장
+// ══════════════════════════════════════════
+
+async function loadEmpData() {
+    try {
+        const res  = await sheetsPost({ action:'getEmpData' });
+        allEmpData   = res.empData  || {};
+        allLeaveData = res.leaveData || {};
+        updateEmpFilter();
+        renderLeaveList();
+    } catch(e) {
+        console.warn('직원 데이터 로드 실패:', e.message);
+    }
+}
+
+async function saveEmpDataBatch(date, empDayData) {
+    try {
+        await sheetsPost({ action:'saveEmpData', date, data: empDayData });
+        // 로컬 캐시 갱신
+        allEmpData[date] = allEmpData[date] || {};
+        for (const emp in empDayData) {
+            allEmpData[date][emp] = empDayData[emp];
+        }
+        updateEmpFilter();
+    } catch(e) { console.warn('직원 데이터 저장 실패:', e.message); }
+}
+
+// Tab 6 전용 Excel 업로드
+async function handleEmpExcelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('empUploadStatus');
+    const progressEl = document.getElementById('empUploadProgress');
+    statusEl.innerText = '파싱 중...';
+    progressEl.style.display = 'block';
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+            const ws   = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+            // 헤더 찾기
+            let headerRow = -1;
+            for (let i=0; i<Math.min(rows.length,10); i++) {
+                if (rows[i].some(c=>String(c).includes('발급시간'))) { headerRow=i; break; }
+            }
+            if (headerRow < 0) { statusEl.innerText = '⚠️ KIOSK 파일 형식 아님'; return; }
+
+            const hdrs   = rows[headerRow].map(c=>String(c).trim());
+            const dIdx   = hdrs.indexOf('일자');
+            const sIdx   = hdrs.indexOf('사유');
+            const tIdx   = hdrs.indexOf('발급시간');
+            const eIdx   = hdrs.indexOf('호출자');
+
+            if (eIdx < 0) { statusEl.innerText = '⚠️ 호출자(K열) 없음'; return; }
+
+            const empDay = {}; // { date: { emp: { slot: {susok,yeyak,pass,wmsd} } } }
+            let cnt = 0;
+
+            for (let i=headerRow+1; i<rows.length; i++) {
+                const row = rows[i];
+                const rawDate = String(row[dIdx]||'').trim();
+                const sau     = String(row[sIdx]||'').trim();
+                const rawTime = row[tIdx];
+                const emp     = String(row[eIdx]||'').trim();
+                if (!rawDate||!sau||rawTime===''||!emp) continue;
+
+                const dateStr = /^\d{8}$/.test(rawDate)
+                    ? rawDate.slice(0,4)+'-'+rawDate.slice(4,6)+'-'+rawDate.slice(6,8)
+                    : rawDate;
+
+                let timeStr = '';
+                if (typeof rawTime==='number') {
+                    const s=Math.round(rawTime*86400), h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+                    timeStr = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':00';
+                } else { timeStr = String(rawTime).trim(); }
+
+                const slot = timeToSlot(timeStr);
+                if (!slot) continue;
+
+                let field = null;
+                if (sau==='입원수속') field='susok';
+                else if (sau==='입원예약') field='yeyak';
+                else if (sau==='출입증')   field='pass';
+                else if (sau==='원무상담') field='wmsd';
+                else continue;
+
+                if (!empDay[dateStr]) empDay[dateStr] = {};
+                if (!empDay[dateStr][emp]) empDay[dateStr][emp] = {};
+                if (!empDay[dateStr][emp][slot]) empDay[dateStr][emp][slot]={susok:0,yeyak:0,pass:0,wmsd:0};
+                empDay[dateStr][emp][slot][field]++;
+                cnt++;
+            }
+
+            const dates = Object.keys(empDay);
+            progressEl.innerText = `${dates.length}일 / ${cnt}건 파싱 완료 — Sheets에 저장 중...`;
+
+            // 날짜별로 저장
+            let saved = 0;
+            for (const date of dates) {
+                await saveEmpDataBatch(date, empDay[date]);
+                saved++;
+                progressEl.innerText = `저장 중... ${saved}/${dates.length}일`;
+            }
+
+            progressEl.innerText = `✅ 완료! ${dates.length}일치 ${cnt}건 저장됨`;
+            statusEl.innerText = '';
+            updateEmpFilter();
+            showToast(`직원별 데이터 ${dates.length}일치 저장 완료`, '#10b981');
+        } catch(err) {
+            statusEl.innerText = '⚠️ 오류: ' + err.message;
+        }
+        event.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ══════════════════════════════════════════
+//  직원 필터 / 연차 관리
+// ══════════════════════════════════════════
+function updateEmpFilter() {
+    const emps = getEmployeeList();
+    // 연차 직원 선택 옵션
+    const sel = document.getElementById('leaveEmp');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">직원 선택</option>';
+    emps.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e; opt.text = e;
+        sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+
+    // 분석 필터 체크박스
+    const filterDiv = document.getElementById('empFilter');
+    filterDiv.innerHTML = '';
+    emps.forEach((e, i) => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
+        label.innerHTML = `<input type="checkbox" value="${e}" checked style="width:13px;height:13px;">
+            <span class="emp-tag active" style="background:${EMP_COLORS[i%EMP_COLORS.length]}22;color:${EMP_COLORS[i%EMP_COLORS.length]};border-color:${EMP_COLORS[i%EMP_COLORS.length]};">${e}</span>`;
+        filterDiv.appendChild(label);
+    });
+}
+
+function getEmployeeList() {
+    const emps = new Set();
+    for (const date in allEmpData) {
+        for (const emp in allEmpData[date]) emps.add(emp);
+    }
+    return Array.from(emps).sort();
+}
+
+function addLeave() {
+    const emp  = document.getElementById('leaveEmp').value;
+    const date = document.getElementById('leaveDate').value;
+    const type = document.getElementById('leaveType').value;
+    if (!emp || !date) return alert('직원과 날짜를 선택하세요.');
+
+    if (!allLeaveData[emp]) allLeaveData[emp] = [];
+    // 중복 제거
+    allLeaveData[emp] = allLeaveData[emp].filter(l => l.date !== date);
+    allLeaveData[emp].push({ date, type });
+    allLeaveData[emp].sort((a,b) => a.date.localeCompare(b.date));
+
+    // Sheets 저장
+    sheetsPost({ action:'addLeave', employee:emp, date, type }).catch(e=>console.warn(e));
+    renderLeaveList();
+    showToast(`${emp} ${date} ${type} 연차 추가`, '#f59e0b');
+}
+
+function deleteLeave(emp, date) {
+    if (!allLeaveData[emp]) return;
+    allLeaveData[emp] = allLeaveData[emp].filter(l => l.date !== date);
+    sheetsPost({ action:'deleteLeave', employee:emp, date }).catch(e=>console.warn(e));
+    renderLeaveList();
+}
+
+function renderLeaveList() {
+    const div = document.getElementById('leaveList');
+    const emps = Object.keys(allLeaveData).filter(e => allLeaveData[e].length > 0);
+    if (emps.length === 0) { div.innerHTML = '<span style="color:#94a3b8;font-size:12px;">연차 데이터 없음</span>'; return; }
+
+    div.innerHTML = emps.map(emp => {
+        const chips = allLeaveData[emp].map(l => {
+            const cls = l.type==='전일'?'leave-full': l.type.includes('오전')?'leave-am':'leave-pm';
+            return `<span class="leave-chip ${cls}">${l.date} ${l.type}
+                <button class="leave-del" onclick="deleteLeave('${emp}','${l.date}')">×</button>
+            </span>`;
+        }).join('');
+        return `<div style="margin-bottom:8px;"><strong style="font-size:12px;">${emp}</strong> ${chips}</div>`;
+    }).join('');
+}
+
+// ══════════════════════════════════════════
+//  직원별 분석 실행
+// ══════════════════════════════════════════
+function runEmpAnalysis() {
+    const start = document.getElementById('empStart').value;
+    const end   = document.getElementById('empEnd').value;
+    if (!start||!end||start>end) return alert('올바른 기간을 설정해주세요.');
+
+    const excludeLeave = document.getElementById('excludeLeave').checked;
+    const selectedEmps = Array.from(document.querySelectorAll('#empFilter input:checked')).map(c=>c.value);
+    if (selectedEmps.length===0) return alert('직원을 1명 이상 선택하세요.');
+
+    document.getElementById('empPrintPeriod').innerText = `기간: ${start} ~ ${end}`;
+
+    // ── 데이터 집계 ──
+    const empTotals = {}; // { emp: {susok,yeyak,pass,wmsd, days:Set} }
+    const empTime   = {}; // { emp: { slot: total } }
+    const empDOW    = {}; // { emp: { 0~6: total } }
+
+    selectedEmps.forEach(emp => {
+        empTotals[emp] = {susok:0,yeyak:0,pass:0,wmsd:0, days:new Set()};
+        empTime[emp]   = {};  TIME_SLOTS.forEach(t => empTime[emp][t]=0);
+        empDOW[emp]    = {};  [0,1,2,3,4,5,6].forEach(d => empDOW[emp][d]=0);
+    });
+
+    for (const date in allEmpData) {
+        if (date<start||date>end) continue;
+        const dow = new Date(date).getDay();
+
+        selectedEmps.forEach(emp => {
+            if (!allEmpData[date]||!allEmpData[date][emp]) return;
+            const leave = (allLeaveData[emp]||[]).find(l=>l.date===date);
+
+            TIME_SLOTS.forEach(slot => {
+                const d = allEmpData[date][emp][slot];
+                if (!d) return;
+                // 연차 제외 로직
+                if (excludeLeave && leave) {
+                    if (leave.type==='전일') return; // 전일 제외
+                    if (leave.type==='반차(오전)' && AM_SLOTS.includes(slot)) return;
+                    if (leave.type==='반차(오후)' && !AM_SLOTS.includes(slot)) return;
+                }
+                const t = (d.susok||0)+(d.yeyak||0)+(d.pass||0);
+                if (t===0) return;
+                empTotals[emp].susok += d.susok||0;
+                empTotals[emp].yeyak += d.yeyak||0;
+                empTotals[emp].pass  += d.pass||0;
+                empTotals[emp].wmsd  += d.wmsd||0;
+                empTotals[emp].days.add(date);
+                empTime[emp][slot]   += t;
+                empDOW[emp][dow]     += t;
+            });
+        });
+    }
+
+    // ── 요약 카드 ──
+    const statGrid = document.getElementById('empStatGrid');
+    statGrid.style.display = 'grid';
+    statGrid.innerHTML = selectedEmps.map(emp => {
+        const t = empTotals[emp];
+        const tot = t.susok+t.yeyak+t.pass;
+        const days = t.days.size;
+        const leaveDays = calcLeaveDays(emp, start, end, excludeLeave);
+        const avg = days>0 ? (tot/days).toFixed(1) : 0;
+        return `<div class="emp-stat-box">
+            <div class="emp-stat-label">${emp}</div>
+            <div class="emp-stat-value">${tot}</div>
+            <div class="emp-stat-sub">실근무 ${days}일 | 일평균 ${avg}건</div>
+            <div class="emp-stat-sub" style="color:#f59e0b;">${leaveDays>0?'연차 '+leaveDays+'일 제외':''}</div>
+        </div>`;
+    }).join('');
+
+    // ── 비교 막대 (수평) ──
+    if (empChartCompare) empChartCompare.destroy();
+    empChartCompare = new Chart(document.getElementById('empCompareChart').getContext('2d'), {
+        type:'bar',
+        data:{
+            labels: selectedEmps,
+            datasets:[
+                {label:'입원수속',data:selectedEmps.map(e=>empTotals[e].susok),backgroundColor:'#a2c2e6'},
+                {label:'입원예약',data:selectedEmps.map(e=>empTotals[e].yeyak),backgroundColor:'#b5eada'},
+                {label:'출입증',  data:selectedEmps.map(e=>empTotals[e].pass), backgroundColor:'#fce4b6'},
+            ]
+        },
+        options:{
+            indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'},datalabels:{
+                color:'#1e293b',font:{weight:'bold',size:9},
+                formatter:v=>v>0?v:'',display:ctx=>ctx.dataset.data[ctx.dataIndex]>0
+            }},
+            scales:{x:{stacked:true,beginAtZero:true},y:{stacked:true}}
+        }
+    });
+
+    // ── 도넛: 전체 사유별 ──
+    const totS=selectedEmps.reduce((a,e)=>a+empTotals[e].susok,0);
+    const totY=selectedEmps.reduce((a,e)=>a+empTotals[e].yeyak,0);
+    const totP=selectedEmps.reduce((a,e)=>a+empTotals[e].pass,0);
+    if (empChartDonut) empChartDonut.destroy();
+    empChartDonut = new Chart(document.getElementById('empDonutChart').getContext('2d'), {
+        type:'doughnut',
+        data:{labels:['입원수속','입원예약','출입증'],
+              datasets:[{data:[totS,totY,totP],backgroundColor:['#a2c2e6','#b5eada','#fce4b6'],borderWidth:1}]},
+        options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'},datalabels:{
+                color:'#1e293b',font:{weight:'bold',size:11},
+                formatter:(v,ctx)=>{const t=ctx.chart.data.datasets[0].data.reduce((a,b)=>a+b,0);return t>0&&v>0?v+' ('+(v/t*100).toFixed(1)+'%)':'';},
+                display:ctx=>ctx.dataset.data[ctx.dataIndex]>0
+            }}}
+    });
+
+    // ── 시간대별 ──
+    if (empChartTime) empChartTime.destroy();
+    empChartTime = new Chart(document.getElementById('empTimeChart').getContext('2d'), {
+        type:'bar',
+        data:{
+            labels: TIME_SLOTS.map(t=>t.split(' - ')[0]),
+            datasets: selectedEmps.map((emp,i)=>({
+                label:emp, stack:'s',
+                data:TIME_SLOTS.map(t=>empTime[emp][t]),
+                backgroundColor: EMP_COLORS[i%EMP_COLORS.length]+'99'
+            }))
+        },
+        options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+            scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
+    });
+
+    // ── 요일별 ──
+    const DOW_LABELS=['일','월','화','수','목','금','토'];
+    const displayOrder=[1,2,3,4,5,6,0];
+    if (empChartDOW) empChartDOW.destroy();
+    empChartDOW = new Chart(document.getElementById('empDOWChart').getContext('2d'), {
+        type:'bar',
+        data:{
+            labels: displayOrder.map(d=>DOW_LABELS[d]),
+            datasets: selectedEmps.map((emp,i)=>({
+                label:emp, stack:'s',
+                data:displayOrder.map(d=>empDOW[emp][d]),
+                backgroundColor: EMP_COLORS[i%EMP_COLORS.length]+'99'
+            }))
+        },
+        options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+            scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
+    });
+
+    // ── 상세 테이블 ──
+    const tbody = document.getElementById('empDetailBody');
+    tbody.innerHTML = selectedEmps.map(emp => {
+        const t=empTotals[emp], tot=t.susok+t.yeyak+t.pass;
+        const days=t.days.size, lv=calcLeaveDays(emp,start,end,excludeLeave);
+        const avg = days>0?(tot/days).toFixed(1):0;
+        return `<tr>
+            <td style="padding:7px 8px;border:1px solid var(--border);font-weight:700;">${emp}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);">${days}일</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);color:#f59e0b;">${lv}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);">${days}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);">${t.susok}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);">${t.yeyak}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);">${t.pass}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);font-weight:800;color:var(--danger);">${tot}</td>
+            <td style="padding:7px 8px;border:1px solid var(--border);font-weight:700;color:#3b82f6;">${avg}</td>
+        </tr>`;
+    }).join('');
+}
+
+function calcLeaveDays(emp, start, end, excludeLeave) {
+    if (!excludeLeave || !allLeaveData[emp]) return 0;
+    return allLeaveData[emp].filter(l => l.date>=start && l.date<=end)
+        .reduce((s,l) => s + (l.type==='전일' ? 1 : 0.5), 0);
+}
+
 // ══════════════════════════════════════════
 //  인쇄 / 유틸
 // ══════════════════════════════════════════
@@ -1396,6 +1959,11 @@ function printSection(tabNum) {
         const yr=document.getElementById('monthlyYear').value;
         const el=document.getElementById('monthPrintYear');
         if(el) el.innerText='연도: '+yr+'년';
+    }
+    if(tabNum===6){
+        const s=document.getElementById('empStart').value, e=document.getElementById('empEnd').value;
+        const el=document.getElementById('empPrintPeriod');
+        if(el&&s&&e) el.innerText='기간: '+s+' ~ '+e;
     }
     document.body.dataset.ptab = tabNum;
     window.print();
